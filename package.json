@@ -1,5 +1,5 @@
 {
-	"name": "your-module-name",
+	"name": "multicam-systems-rcp",
 	"version": "0.1.0",
 	"main": "main.js",
 	"scripts": {
@@ -11,7 +11,11 @@
 		"url": "git+https://github.com/bitfocus/companion-module-your-module-name.git"
 	},
 	"dependencies": {
-		"@companion-module/base": "~1.0.1"
+		"@companion-module/base": "~1.0.1",
+		"object-path": "^0.11.8",
+		"socket.io-client": "^4.6.1",
+		"websocket": "^1.0.34",
+		"ws": "^8.13.0"
 	},
 	"devDependencies": {
 		"@companion-module/tools": "^0.5.1"
