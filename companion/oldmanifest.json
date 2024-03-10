@@ -2,15 +2,15 @@
 	"id": "multicam-systems-rcp",
 	"name": "multicam-systems-rcp",
 	"shortname": "multicam-systems-rcp",
-	"description": "Multicam RCP plugin for Companion",
+	"description": "A short one line description of your module",
 	"version": "0.0.0",
 	"license": "MIT",
-	"repository": "git+https://github.com/bitfocus/companion-module-multicam-systems-rcp.git",
-	"bugs": "https://github.com/bitfocus/companion-module-multicam-systems-rcp/issues",
+	"repository": "git+https://github.com/bitfocus/companion-module-your-module-name.git",
+	"bugs": "https://github.com/bitfocus/companion-module-your-module-name/issues",
 	"maintainers": [
 		{
-			"name": "Håvard Njåstad",
-			"email": "havard@multicammedia.no"
+			"name": "Your name",
+			"email": "Your email"
 		}
 	],
 	"runtime": {

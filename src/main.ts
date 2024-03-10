@@ -1,65 +1,100 @@
-const { InstanceBase, runEntrypoint, Regex, InstanceStatus } = require('@companion-module/base')
-const objectPath = require('object-path')
-const io = require('socket.io-client')
+
+import { InstanceBase, runEntrypoint, InstanceStatus, SomeCompanionConfigField, DropdownChoice, CompanionVariableDefinition } from '@companion-module/base'
+import { type ModuleConfig, GetConfigFields} from './config.js'
+import { UpdateVariableDefinitions } from './variables.js'
+import { UpgradeScripts } from './upgrades.js'
+import { UpdateActions } from './actions.js'
+import { UpdateFeedbacks } from './feedbacks.js'
+import * as objectPath from 'object-path'
+import { io } from 'socket.io-client'
+
+export interface cameraDataFromWebSocket {
+
+	uuid: string;
+	model_descriptor: {
+		control_properties: {
+			[key: string]: {
+				value: number
+			}
+		}
+	}	
+
+}
+
+export class ModuleInstance extends InstanceBase<ModuleConfig> {
+	config!: ModuleConfig // Setup in init()
+	isInitialized: boolean;
+	subscriptions = new Map<string, {variableName: string, subpath: string}>()
+	cameras: cameraDataFromWebSocket[];
+	reconnect_timer: NodeJS.Timeout | null = null
+	socket: any
+	once: any
 
 
-class WebsocketInstance extends InstanceBase {
-	isInitialized = false
-
-	subscriptions = new Map()
-
-	async init(config) {
-
-		this.cameras;
-
-		this.config = config
-
-		this.initWebSocket()
-		this.isInitialized = true
-
-
-
-		// this.updateVariables()
-		// this.initActions()
-		this.initFeedbacks()
-		this.subscribeFeedbacks()
-	}
-
-
-	async destroy() {
+	constructor(internal: unknown) {
+		super(internal)
+		this.cameras = [];
+		this.once = true;
 		this.isInitialized = false
-		if (this.reconnect_timer) {
-			clearTimeout(this.reconnect_timer)
-			this.reconnect_timer = null
-		}
-		if (this.socket) {
-			this.socket.close(1000)
-			delete this.socket
-		}
+
 	}
 
-	async configUpdated(config) {
+	async init(config: ModuleConfig): Promise<void> {
+
+
+		this.config = config
+
+
+		this.updateStatus(InstanceStatus.Ok)
+
+		this.updateActions() // export actions
+		this.updateFeedbacks() // export feedbacks
+		this.updateVariableDefinitions() // export variable definitions
+	}
+	// When module gets deleted
+	async destroy(): Promise<void> {
+		this.log('debug', 'destroy')
+	}
+
+	async configUpdated(config: ModuleConfig): Promise<void> {
 		this.config = config
 		this.initWebSocket()
 	}
 
-	updateVariables(callerId = null) {
-		let variables = new Set()
-		let defaultValues = {}
+	// Return config fields for web config
+	getConfigFields(): SomeCompanionConfigField[] {
+		return GetConfigFields()
+	}
+
+	updateActions(): void {
+		UpdateActions(this)
+	}
+
+	updateFeedbacks(): void {
+		UpdateFeedbacks(this)
+	}
+
+	updateVariableDefinitions(): void {
+		UpdateVariableDefinitions(this)
+	}
+
+	updateVariables(callerId?: string) {
+		let variables = new Set<string>()
+		let defaultValues: any = {}
 		this.subscriptions.forEach((subscription, subscriptionId) => {
 			if (!subscription.variableName.match(/^[-a-zA-Z0-9_]+$/)) {
 				return
 			}
 			variables.add(subscription.variableName)
-			if (callerId === null || callerId === subscriptionId) {
+			if (callerId && callerId === subscriptionId) {
 				defaultValues[subscription.variableName] = ''
 			}
 		})
-		let variableDefinitions = []
+		let variableDefinitions: CompanionVariableDefinition[] = []
 		variables.forEach((variable) => {
 			variableDefinitions.push({
-				name: variable,
 				variableId: variable,
+				name: variable,
 			})
 		})
 		this.setVariableDefinitions(variableDefinitions)
@@ -112,18 +147,18 @@ class WebsocketInstance extends InstanceBase {
 				this.updateVariables()
 			}
 		})
-		this.socket.on('close', (code) => {
+		this.socket.on('close', (code: any) => {
 			this.log('debug', `Connection closed with code ${code}`)
 			this.updateStatus(InstanceStatus.Disconnected, `Connection closed with code ${code}`)
 			this.maybeReconnect()
 		})
 
-		this.socket.on('message', (data) =>{
+		this.socket.on('message', (data: any) =>{
 			this.log('debug', data)
 
 		})
 
-		this.socket.on('error', (data) => {
+		this.socket.on('error', (data: any) => {
 			this.log('error', `WebSocket error: ${data}`)
 		})
 		this.setVariableDefinitions([
@@ -133,13 +168,13 @@ class WebsocketInstance extends InstanceBase {
 
 
 		this.once = true;
-		this.socket.on(`cameras`, (data) => {
+		this.socket.on(`cameras`, (data: cameraDataFromWebSocket[]) => {
 			if(this.once){
 				this.log('debug', `Running once`)
 				this.cameras = data;
-				var newVariables = [];
-				var cameraDropdownChoices = [];
-				var settingDropdownChoices = [];
+				var newVariables: CompanionVariableDefinition[] = [];
+				var cameraDropdownChoices: DropdownChoice[] = [];
+				var settingDropdownChoices: DropdownChoice[] = [];
 				Object.keys(this.cameras[0]["model_descriptor"]["control_properties"]).forEach(control_property => {
 					settingDropdownChoices.push(
 						{ id: control_property, label: control_property}
@@ -153,25 +188,25 @@ class WebsocketInstance extends InstanceBase {
 								name: "camera" + index + control_property,
 							}
 						)
-						this.socket.on(`node::${camera.uuid}::${control_property}`, (data) => {
-							var variableObject = {};
+						this.socket.on(`node::${camera.uuid}::${control_property}`, (data: any) => {
+							var variableObject: any = {};
 							variableObject[ "camera" + index + control_property] = data
 							this.setVariableValues(variableObject)
-							if(this.cameras["model_descriptor"]){
+							if(this.cameras[index]["model_descriptor"]){
 							}
 							else{
-								this.cameras["model_descriptor"] = {}
+								this.cameras[index]["model_descriptor"] = { "control_properties": {}}
 								
 							}
-							if(this.cameras["model_descriptor"]["control_properties"]){
+							if(this.cameras[index]["model_descriptor"]["control_properties"]){
 							}
 							else{
-								this.cameras["model_descriptor"]["control_properties"] = {}
+								this.cameras[index]["model_descriptor"]["control_properties"] = {}
 							}
-							if(this.cameras["model_descriptor"]["control_properties"][control_property]){
+							if(this.cameras[index]["model_descriptor"]["control_properties"][control_property]){
 							}
 							else{
-								this.cameras["model_descriptor"]["control_properties"][control_property] = {}
+								this.cameras[index]["model_descriptor"]["control_properties"][control_property] = {value: 0}
 							}
 							this.cameras[index]["model_descriptor"]["control_properties"][control_property].value = data
 						})
@@ -190,12 +225,14 @@ class WebsocketInstance extends InstanceBase {
 								type: 'dropdown',
 								label: 'Select camera',
 								choices: cameraDropdownChoices,
+								default: cameraDropdownChoices[0].id
 							},
 							{
 								id: 'setting',
 								type: 'dropdown',
 								label: 'Select setting',
 								choices: settingDropdownChoices,
+								default: cameraDropdownChoices[0].id
 							},
 							{
 								id: 'value',
@@ -206,11 +243,16 @@ class WebsocketInstance extends InstanceBase {
 								max: 100
 							}
 						],
-						callback: async (action, context) => {
+						callback: async (
+							action, 
+							// context
+							) => {
 							try {
 								var selectedCamera = this.cameras.filter(obj => {
 									return obj.uuid === action.options.cameraUuid
 								})[0]
+								if(typeof(action.options.setting) != "string"){return;}
+								if(typeof(action.options.value) != "number"){return;}
 								var oldValue = Math.floor((+selectedCamera["model_descriptor"]["control_properties"][action.options.setting].value)*1000)/1000
 								console.log(oldValue)
 								var string = "node-update::" + action.options.cameraUuid + "::" + action.options.setting + " " + (+action.options.value + +oldValue)
@@ -219,8 +261,12 @@ class WebsocketInstance extends InstanceBase {
 								console.log(+oldValue)
 								this.socket.emit("node-update", [action.options.cameraUuid, action.options.setting, (Math.floor((+action.options.value*1000)) / 1000 + +oldValue)])
 								
-							} catch (error) {
-								this.log('error', error.message)
+							} catch(e){
+								if (typeof e === "string") {
+									this.log('error', e)
+								} else if (e instanceof Error) {
+									this.log('error', e.message)
+								}
 							}
 
 
@@ -235,7 +281,7 @@ class WebsocketInstance extends InstanceBase {
 
 	}
 
-	messageReceivedFromWebSocket(data) {
+	messageReceivedFromWebSocket(data: string) {
 		if (this.config.debug_messages) {
 			this.log('debug', `Message received: ${data}`)
 		}
@@ -256,63 +302,12 @@ class WebsocketInstance extends InstanceBase {
 					[subscription.variableName]: typeof msgValue === 'object' ? JSON.stringify(msgValue) : msgValue,
 				})
 			} else if (typeof msgValue === 'object' && objectPath.has(msgValue, subscription.subpath)) {
-				let value = objectPath.get(msgValue, subscription.subpath)
-				this.setVariable({
-					[subscription.variableName]: typeof value === 'object' ? JSON.stringify(value) : value,
-				})
+				// let value = objectPath.get(msgValue, subscription.subpath)
+				// this.setVariable({
+				// 	[subscription.variableName]: typeof value === 'object' ? JSON.stringify(value) : value,
+				// })
 			}
 		})
-	}
-
-	getConfigFields() {
-		return [
-			{
-				type: 'static-text',
-				id: 'info',
-				width: 12,
-				label: 'Information',
-				value:
-					"<strong>PLEASE READ THIS!</strong> Generic modules is only for use with custom applications. If you use this module to control a device or software on the market that more than you are using, <strong>PLEASE let us know</strong> about this software, so we can make a proper module for it. If we already support this and you use this to trigger a feature our module doesn't support, please let us know. We want companion to be as easy as possible to use for anyone.",
-			},
-			{
-				type: 'textinput',
-				id: 'host',
-				label: 'Target host',
-				tooltip: 'The host of the WebSocket server',
-				width: 6,
-			},
-			{
-				type: 'textinput',
-				id: 'port',
-				label: 'Port',
-				tooltip: 'The port of the WebSocket server',
-				width: 6,
-				regex: Regex.NUMBER,
-			},
-			{
-				type: 'checkbox',
-				id: 'reconnect',
-				label: 'Reconnect',
-				tooltip: 'Reconnect on WebSocket error (after 5 secs)',
-				width: 6,
-				default: true,
-			},
-			{
-				type: 'checkbox',
-				id: 'debug_messages',
-				label: 'Debug messages',
-				tooltip: 'Log incomming and outcomming messages',
-				width: 6,
-			},
-			{
-				type: 'checkbox',
-				id: 'reset_variables',
-				label: 'Reset variables',
-				tooltip: 'Reset variables on init and on connect',
-				width: 6,
-				default: true,
-			},
-		]
 	}
 
 	initFeedbacks() {
@@ -342,6 +337,16 @@ class WebsocketInstance extends InstanceBase {
 					return {}
 				},
 				subscribe: (feedback) => {
+					if (typeof(feedback.options.variable) !== 'string' || feedback.options.variable === '') {
+						return
+					}
+					if (typeof(feedback.options.subpath) !== 'string') {
+						feedback.options.subpath = ''
+					}
+					if(typeof(feedback.id) !== 'string'){
+						return
+					}
+
 					this.subscriptions.set(feedback.id, {
 						variableName: feedback.options.variable,
 						subpath: feedback.options.subpath,
@@ -371,6 +376,7 @@ class WebsocketInstance extends InstanceBase {
 					},
 				],
 				callback: async (action, context) => {
+					if(typeof(action.options.data) !== 'string'){return;}
 					const value = await context.parseVariablesInString(action.options.data)
 					if (this.config.debug_messages) {
 						this.log('debug', `Message sent: ${value}`)
@@ -380,6 +386,7 @@ class WebsocketInstance extends InstanceBase {
 			},
 		})
 	}
+	
 }
 
-runEntrypoint(WebsocketInstance, [])
+runEntrypoint(ModuleInstance, UpgradeScripts)
