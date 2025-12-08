@@ -1,6 +1,6 @@
 {
-	"name": "your-module-name",
-	"version": "0.1.0",
+	"name": "companion-module-multicam-systems-rcp",
+	"version": "1.0.0",
 	"main": "dist/main.js",
 	"type": "module",
 	"scripts": {
@@ -10,26 +10,31 @@
 		"build": "rimraf dist && yarn build:main",
 		"build:main": "tsc -p tsconfig.build.json",
 		"dev": "tsc -p tsconfig.build.json --watch",
-		"lint:raw": "eslint --ext .ts --ext .js --ignore-pattern dist --ignore-pattern pkg",
+		"lint:raw": "eslint",
 		"lint": "yarn lint:raw ."
 	},
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/bitfocus/companion-module-your-module-name.git"
+		"url": "git+https://github.com/bitfocus/companion-module-multicam-systems-rcp.git"
+	},
+	"engines": {
+		"node": "^22.20"
 	},
 	"dependencies": {
-		"@companion-module/base": "~1.7.0",
-		"@types/object-path": "^0.11.4",
-		"object-path": "^0.11.8",
+		"@companion-module/base": "~1.12.1",
 		"socket.io-client": "^4.7.4"
 	},
 	"devDependencies": {
-		"@companion-module/tools": "^1.4.2",
-		"husky": "^9.0.10",
-		"jest": "^29.7.0",
-		"lint-staged": "^15.2.2",
-		"typescript": "^5.3.3"
+		"@companion-module/tools": "^2.4.2",
+		"@types/node": "^22.18.13",
+		"eslint": "^9.39.0",
+		"husky": "^9.1.7",
+		"lint-staged": "^16.2.6",
+		"prettier": "^3.6.2",
+		"rimraf": "^6.1.0",
+		"typescript": "~5.8.3",
+		"typescript-eslint": "^8.46.2"
 	},
 	"prettier": "@companion-module/tools/.prettierrc.json",
 	"lint-staged": {
@@ -39,5 +44,6 @@
 		"*.{ts,tsx,js,jsx}": [
 			"yarn lint:raw --fix"
 		]
-	}
+	},
+	"packageManager": "yarn@4.10.3"
 }
