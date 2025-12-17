@@ -1,6 +1,6 @@
 {
-	"name": "companion-module-multicam-systems-rcp",
-	"version": "1.0.1",
+	"name": "multicam-systems-rcp",
+	"version": "1.0.2",
 	"main": "dist/main.js",
 	"type": "module",
 	"scripts": {
