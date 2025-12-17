@@ -1002,24 +1002,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"companion-module-multicam-systems-rcp@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "companion-module-multicam-systems-rcp@workspace:."
-  dependencies:
-    "@companion-module/base": "npm:~1.12.1"
-    "@companion-module/tools": "npm:^2.4.2"
-    "@types/node": "npm:^22.18.13"
-    eslint: "npm:^9.39.0"
-    husky: "npm:^9.1.7"
-    lint-staged: "npm:^16.2.6"
-    prettier: "npm:^3.6.2"
-    rimraf: "npm:^6.1.0"
-    socket.io-client: "npm:^4.8.1"
-    typescript: "npm:~5.8.3"
-    typescript-eslint: "npm:^8.46.2"
-  languageName: unknown
-  linkType: soft
-
 "concat-map@npm:0.0.1":
   version: 0.0.1
   resolution: "concat-map@npm:0.0.1"
@@ -2031,6 +2013,24 @@ __metadata:
   checksum: 10c0/a437714e2f90dbf881b5191d35a6db792efbca5badf112f87b9e1c712aace4b4b9b742dd6537f3edf90fd6f684de897cec230abde57e87883766712ddda297cc
   languageName: node
   linkType: hard
+
+"multicam-systems-rcp@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "multicam-systems-rcp@workspace:."
+  dependencies:
+    "@companion-module/base": "npm:~1.12.1"
+    "@companion-module/tools": "npm:^2.4.2"
+    "@types/node": "npm:^22.18.13"
+    eslint: "npm:^9.39.0"
+    husky: "npm:^9.1.7"
+    lint-staged: "npm:^16.2.6"
+    prettier: "npm:^3.6.2"
+    rimraf: "npm:^6.1.0"
+    socket.io-client: "npm:^4.8.1"
+    typescript: "npm:~5.8.3"
+    typescript-eslint: "npm:^8.46.2"
+  languageName: unknown
+  linkType: soft
 
 "nano-spawn@npm:^2.0.0":
   version: 2.0.0

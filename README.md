@@ -1,4 +1,4 @@
-# companion-module-[replace with module name]
+# companion-module-multicam-systems-rcp
 
 See [HELP.md](./companion/HELP.md) and [LICENSE](./LICENSE)
 
