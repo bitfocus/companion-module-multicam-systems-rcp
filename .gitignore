@@ -4,3 +4,6 @@ package-lock.json
 /pkg.tgz
 /dist
 DEBUG-*
+
+# Packaged module artifacts
+*.tgz

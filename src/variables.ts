@@ -6,7 +6,7 @@ import type { PropertyValue } from './types.js'
  * Update variable definitions based on current camera data
  */
 export function UpdateVariableDefinitions(self: ModuleInstance): void {
-	const variables: CompanionVariableDefinition[] = []
+	const variables: (CompanionVariableDefinition & { variableId: string })[] = []
 
 	// Global variables
 	variables.push({
@@ -104,7 +104,10 @@ export function UpdateVariableDefinitions(self: ModuleInstance): void {
 		}
 	})
 
-	self.setVariableDefinitions(variables)
+	self.variableIds = variables.map((variable) => variable.variableId)
+	self.setVariableDefinitions(
+		Object.fromEntries(variables.map(({ variableId, ...definition }) => [variableId, definition])),
+	)
 
 	// Set initial values
 	UpdateVariableValues(self)
@@ -117,7 +120,7 @@ export function UpdateVariableValues(self: ModuleInstance): void {
 	const values: CompanionVariableValues = {}
 
 	// Global variables
-	values['connected'] = self.socket?.connected ? 'Yes' : 'No'
+	values['connected'] = self.connected ? 'Yes' : 'No'
 	values['camera_count'] = self.cameras.length
 	values['user_count'] = self.users.length
 
@@ -140,7 +143,7 @@ export function UpdateVariableValues(self: ModuleInstance): void {
 		values[`${prefix}_uuid`] = camera.uuid
 
 		// Get tally state
-		const tallyColor = self.getCameraTallyColor(camera.uuid)
+		const tallyColor = self.connected ? self.getCameraTallyColor(camera.uuid) : 'off'
 		values[`${prefix}_tally`] = tallyColor
 		values[`${prefix}_tally_color`] = tallyColor
 
@@ -161,7 +164,7 @@ export function UpdateVariableValues(self: ModuleInstance): void {
 		values[`${prefix}_name`] = user.name || 'Unknown'
 		values[`${prefix}_uuid`] = user.uuid || ''
 
-		if (user.previewedCameraUuid) {
+		if (self.connected && user.previewedCameraUuid) {
 			const previewedCamera = self.cameras.find((c) => c.uuid === user.previewedCameraUuid)
 			values[`${prefix}_preview_camera`] = previewedCamera?.name || 'Unknown'
 			values[`${prefix}_preview_camera_uuid`] = user.previewedCameraUuid

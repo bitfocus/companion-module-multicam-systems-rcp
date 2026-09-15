@@ -1,5 +1,10 @@
-import { combineRgb, type CompanionPresetDefinitions } from '@companion-module/base'
-import type { ModuleInstance } from './main.js'
+import { addGraphicsPresets } from './graphics.js'
+import {
+	combineRgb,
+	type CompanionPresetDefinitions,
+	type CompanionSimplePresetDefinition,
+} from '@companion-module/base'
+import type { ModuleInstance, ModuleTypes } from './main.js'
 
 // Style constants
 const COLORS = {
@@ -176,7 +181,7 @@ function getPropertyColor(prop: string): number {
 }
 
 export function UpdatePresets(self: ModuleInstance): void {
-	const presets: CompanionPresetDefinitions = {}
+	const presets: Record<string, CompanionSimplePresetDefinition<ModuleTypes> & { category: string }> = {}
 
 	// Debug logging
 	if (self.config.debug_messages) {
@@ -228,7 +233,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 			// Group header button (placeholder/separator)
 			presets[`cam_${camIdShort}_group_${group}`] = {
-				type: 'button',
+				type: 'simple',
 				category: folderName,
 				name: `[${groupConfig.displayName}]`,
 				style: {
@@ -262,7 +267,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 					// Increase button (for 3-button setup)
 					presets[`cam_${camIdShort}_${propIdShort}_inc`] = {
-						type: 'button',
+						type: 'simple',
 						category: folderName,
 						name: `${propDisplayName} +`,
 						style: {
@@ -287,7 +292,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 					// Increase with value button (for 2-button setup)
 					presets[`cam_${camIdShort}_${propIdShort}_inc_val`] = {
-						type: 'button',
+						type: 'simple',
 						category: folderName,
 						name: `${propDisplayName} + (value)`,
 						style: {
@@ -312,7 +317,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 					// Value only button (for 3-button setup)
 					presets[`cam_${camIdShort}_${propIdShort}_val`] = {
-						type: 'button',
+						type: 'simple',
 						category: folderName,
 						name: `${propDisplayName} Value`,
 						style: {
@@ -327,7 +332,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 					// Decrease button
 					presets[`cam_${camIdShort}_${propIdShort}_dec`] = {
-						type: 'button',
+						type: 'simple',
 						category: folderName,
 						name: `${propDisplayName} -`,
 						style: {
@@ -354,7 +359,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 					// On button (with feedback when on)
 					presets[`cam_${camIdShort}_${propIdShort}_on`] = {
-						type: 'button',
+						type: 'simple',
 						category: folderName,
 						name: `${propDisplayName} On`,
 						style: {
@@ -385,7 +390,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 					// Off button (with feedback when off)
 					presets[`cam_${camIdShort}_${propIdShort}_off`] = {
-						type: 'button',
+						type: 'simple',
 						category: folderName,
 						name: `${propDisplayName} Off`,
 						style: {
@@ -417,7 +422,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 					// Toggle button (with feedback when on)
 					presets[`cam_${camIdShort}_${propIdShort}_toggle`] = {
-						type: 'button',
+						type: 'simple',
 						category: folderName,
 						name: `${propDisplayName} Toggle`,
 						style: {
@@ -450,7 +455,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 					// Next button (for 3-button setup)
 					presets[`cam_${camIdShort}_${propIdShort}_next`] = {
-						type: 'button',
+						type: 'simple',
 						category: folderName,
 						name: `${propDisplayName} +`,
 						style: {
@@ -475,7 +480,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 					// Next with value button (for 2-button setup)
 					presets[`cam_${camIdShort}_${propIdShort}_next_val`] = {
-						type: 'button',
+						type: 'simple',
 						category: folderName,
 						name: `${propDisplayName} + (value)`,
 						style: {
@@ -500,7 +505,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 					// Value only button (for 3-button setup)
 					presets[`cam_${camIdShort}_${propIdShort}_val`] = {
-						type: 'button',
+						type: 'simple',
 						category: folderName,
 						name: `${propDisplayName} Value`,
 						style: {
@@ -515,7 +520,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 					// Previous button
 					presets[`cam_${camIdShort}_${propIdShort}_prev`] = {
-						type: 'button',
+						type: 'simple',
 						category: folderName,
 						name: `${propDisplayName} -`,
 						style: {
@@ -549,7 +554,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 		// PTZ Preset header
 		presets[`cam_${camIdShort}_ptz_header`] = {
-			type: 'button',
+			type: 'simple',
 			category: folderName,
 			name: '[PTZ Presets]',
 			style: {
@@ -580,7 +585,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					}
 
 			presets[`cam_${camIdShort}_ptz_${presetNum}`] = {
-				type: 'button',
+				type: 'simple',
 				category: folderName,
 				name: `PTZ Preset ${presetNum}`,
 				style: {
@@ -663,7 +668,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 				: { camera: cameraUuid, property: prop, step_size: 'normal' }
 
 			presets[`rotary_${camIdShort}_${propIdShort}`] = {
-				type: 'button',
+				type: 'simple',
 				category: rotaryFolderName,
 				name: `${propDisplayName} (Rotary)`,
 				style: {
@@ -671,9 +676,6 @@ export function UpdatePresets(self: ModuleInstance): void {
 					size: 'auto',
 					color: COLORS.white,
 					bgcolor: propBgColor,
-				},
-				options: {
-					rotaryActions: true,
 				},
 				steps: [
 					{
@@ -724,7 +726,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 			const camIdShort = cameraUuid.substring(0, 8)
 
 			presets[`user_${userIdShort}_cam_${camIdShort}`] = {
-				type: 'button',
+				type: 'simple',
 				category: folderName,
 				name: `Select ${cameraName}`,
 				style: {
@@ -767,7 +769,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 		// ===================
 
 		presets[`user_${userIdShort}_stepsize_header`] = {
-			type: 'button',
+			type: 'simple',
 			category: folderName,
 			name: '[Adjust Step Size]',
 			style: {
@@ -789,7 +791,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 		stepSizes.forEach((size) => {
 			presets[`user_${userIdShort}_stepsize_${size.id}`] = {
-				type: 'button',
+				type: 'simple',
 				category: folderName,
 				name: `Step Size: ${size.label}`,
 				style: {
@@ -824,7 +826,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 		// ===================
 
 		presets[`user_${userIdShort}_ptzmode_header`] = {
-			type: 'button',
+			type: 'simple',
 			category: folderName,
 			name: '[PTZ Mode]',
 			style: {
@@ -846,7 +848,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 		ptzModes.forEach((mode) => {
 			presets[`user_${userIdShort}_ptzmode_${mode.id}`] = {
-				type: 'button',
+				type: 'simple',
 				category: folderName,
 				name: `PTZ Mode: ${mode.label}`,
 				style: {
@@ -881,7 +883,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 		// ===================
 
 		presets[`user_${userIdShort}_ptzaction_header`] = {
-			type: 'button',
+			type: 'simple',
 			category: folderName,
 			name: '[PTZ Action]',
 			style: {
@@ -902,7 +904,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 		ptzActions.forEach((action) => {
 			presets[`user_${userIdShort}_ptzaction_${action.id}`] = {
-				type: 'button',
+				type: 'simple',
 				category: folderName,
 				name: `PTZ Action: ${action.label}`,
 				style: {
@@ -937,7 +939,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 		// ===================
 
 		presets[`user_${userIdShort}_info`] = {
-			type: 'button',
+			type: 'simple',
 			category: folderName,
 			name: `${userName} Info`,
 			style: {
@@ -995,7 +997,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 			const outputName = output.customName || output.name || `Out ${outputIdx}`
 
 			presets[`router_${busIdShort}_out_${outputIdx}`] = {
-				type: 'button',
+				type: 'simple',
 				category: folderName,
 				name: `Output: ${outputName}`,
 				style: {
@@ -1048,7 +1050,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 			const sourceLabel = getSourceLabel(tallyBus, inputIdx)
 
 			presets[`router_${busIdShort}_in_${inputIdx}`] = {
-				type: 'button',
+				type: 'simple',
 				category: folderName,
 				name: `Input: ${sourceLabel}`,
 				style: {
@@ -1107,7 +1109,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 				`Router ${tallyBus.uuid.substring(0, 8)}`
 
 			presets[`user_route_${userIdShort}_module_${tallyBus.uuid.substring(0, 8)}`] = {
-				type: 'button',
+				type: 'simple',
 				category: folderName,
 				name: `Select ${moduleName}`,
 				style: {
@@ -1148,7 +1150,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 		// Generic output buttons (40 slots)
 		for (let outputIdx = 0; outputIdx < MAX_ROUTER_BUTTONS; outputIdx++) {
 			presets[`user_route_${userIdShort}_out_${outputIdx}`] = {
-				type: 'button',
+				type: 'simple',
 				category: folderName,
 				name: `Output ${outputIdx}`,
 				style: {
@@ -1189,7 +1191,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 		// Generic input buttons (40 slots)
 		for (let inputIdx = 0; inputIdx < MAX_ROUTER_BUTTONS; inputIdx++) {
 			presets[`user_route_${userIdShort}_in_${inputIdx}`] = {
-				type: 'button',
+				type: 'simple',
 				category: folderName,
 				name: `Input ${inputIdx}`,
 				style: {
@@ -1236,5 +1238,15 @@ export function UpdatePresets(self: ModuleInstance): void {
 	)
 	self.log('info', `Setting ${Object.keys(presets).length} presets in categories: ${Array.from(categories).join(', ')}`)
 
-	self.setPresetDefinitions(presets)
+	const definitions: CompanionPresetDefinitions<ModuleTypes> = {}
+	const groups = new Map<string, string[]>()
+	for (const [id, { category, ...preset }] of Object.entries(presets)) {
+		definitions[id] = preset
+		const ids = groups.get(category) || []
+		ids.push(id)
+		groups.set(category, ids)
+	}
+	const sections = Array.from(groups, ([name, ids]) => ({ id: name, name, definitions: ids }))
+	addGraphicsPresets(self, definitions, sections)
+	self.setPresetDefinitions(sections, definitions)
 }

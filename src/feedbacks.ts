@@ -1,3 +1,4 @@
+import { graphicsFeedbacks } from './graphics.js'
 import { combineRgb, type CompanionFeedbackDefinitions } from '@companion-module/base'
 import type { ModuleInstance } from './main.js'
 import type { PropertyValue } from './types.js'
@@ -82,7 +83,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 	feedbacks['camera_tally_program'] = {
 		type: 'boolean',
 		name: 'Camera Tally: Program (Red)',
-		description: 'Change style when camera is on program (red tally)',
+		description: 'Active when camera is on program (red tally)',
 		defaultStyle: {
 			bgcolor: TALLY_COLORS.red,
 			color: TEXT_COLORS.light,
@@ -107,7 +108,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 	feedbacks['camera_tally_preview'] = {
 		type: 'boolean',
 		name: 'Camera Tally: Preview (Green)',
-		description: 'Change style when camera is on preview (green tally)',
+		description: 'Active when camera is on preview (green tally)',
 		defaultStyle: {
 			bgcolor: TALLY_COLORS.green,
 			color: TEXT_COLORS.dark,
@@ -131,9 +132,10 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 
 	feedbacks['camera_tally_color'] = {
 		type: 'advanced',
+		affectedProperties: ['bgcolor', 'color', 'imageBuffer'],
 		name: 'Camera Tally: Dynamic Color',
 		description:
-			'Dynamically set background color based on camera tally state. Does not change style when tally is off (allows other feedbacks to show through).',
+			'Dynamically set background color based on camera tally state. Leaves the background unchanged when tally is off (allows other feedbacks to show through).',
 		options: [
 			{
 				id: 'camera',
@@ -153,7 +155,6 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 				type: 'colorpicker',
 				label: 'Off Color (if enabled above)',
 				default: combineRgb(40, 40, 40),
-				isVisible: (options) => options.set_off_color === true,
 			},
 		],
 		callback: (feedback) => {
@@ -186,7 +187,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 	feedbacks['user_previewing_camera'] = {
 		type: 'boolean',
 		name: 'User Previewing Camera',
-		description: 'Change style when a specific user is previewing a specific camera',
+		description: 'Active when a specific user is previewing a specific camera',
 		defaultStyle: {
 			bgcolor: combineRgb(0, 128, 255),
 			color: TEXT_COLORS.light,
@@ -220,7 +221,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 	feedbacks['any_user_previewing_camera'] = {
 		type: 'boolean',
 		name: 'Any User Previewing Camera',
-		description: 'Change style when any user is previewing a specific camera',
+		description: 'Active when any user is previewing a specific camera',
 		defaultStyle: {
 			bgcolor: combineRgb(0, 100, 200),
 			color: TEXT_COLORS.light,
@@ -246,6 +247,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 	// User preview border indicator - can be combined with tally feedbacks
 	feedbacks['user_preview_indicator'] = {
 		type: 'advanced',
+		affectedProperties: ['bgcolor', 'color', 'imageBuffer'],
 		name: 'User Preview Border Indicator',
 		description:
 			'Shows a colored border around the button when a user is previewing. Can be combined with tally feedbacks.',
@@ -301,7 +303,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 			const borderBuffer = generateBorderIndicator(buttonWidth, buttonHeight, borderWidth, { r, g, b })
 
 			return {
-				imageBuffer: borderBuffer,
+				imageBuffer: borderBuffer.toString('base64'),
 				imageBufferPosition: { x: 0, y: 0, width: buttonWidth, height: buttonHeight },
 				imageBufferEncoding: { pixelFormat: 'RGBA' },
 			}
@@ -314,6 +316,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 
 	feedbacks['camera_status'] = {
 		type: 'advanced',
+		affectedProperties: ['bgcolor', 'color', 'imageBuffer'],
 		name: 'Camera Status (Tally + Users)',
 		description: 'Shows tally color as background, or user preview color when no tally but user is previewing',
 		options: [
@@ -383,14 +386,14 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 	feedbacks['connected'] = {
 		type: 'boolean',
 		name: 'Connected to Server',
-		description: 'Change style when connected to Multicam RCP server',
+		description: 'Active when connected to Multicam RCP server',
 		defaultStyle: {
 			bgcolor: combineRgb(0, 200, 0),
 			color: TEXT_COLORS.dark,
 		},
 		options: [],
 		callback: () => {
-			return self.socket?.connected || false
+			return self.connected || false
 		},
 	}
 
@@ -401,7 +404,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 	feedbacks['property_equals'] = {
 		type: 'boolean',
 		name: 'Property Equals Value',
-		description: 'Change style when a camera property equals a specific value',
+		description: 'Active when a camera property equals a specific value',
 		defaultStyle: {
 			bgcolor: combineRgb(255, 200, 0),
 			color: TEXT_COLORS.dark,
@@ -454,7 +457,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 	feedbacks['property_greater_than'] = {
 		type: 'boolean',
 		name: 'Property Greater Than',
-		description: 'Change style when a camera property is greater than a specific value',
+		description: 'Active when a camera property is greater than a specific value',
 		defaultStyle: {
 			bgcolor: combineRgb(200, 200, 0),
 			color: TEXT_COLORS.dark,
@@ -519,7 +522,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 	feedbacks['property_bool'] = {
 		type: 'boolean',
 		name: 'Property: Boolean State',
-		description: 'Change style when a boolean property is true/enabled',
+		description: 'Active when a boolean property is true/enabled',
 		defaultStyle: {
 			bgcolor: combineRgb(0, 150, 255),
 			color: TEXT_COLORS.light,
@@ -724,6 +727,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 	// Route tally color feedback - shows the output's tally color
 	feedbacks['route_tally_color'] = {
 		type: 'advanced',
+		affectedProperties: ['bgcolor', 'color', 'imageBuffer'],
 		name: 'Router: Output Tally Color',
 		description: 'Shows the tally color of a router output',
 		options: [
@@ -755,7 +759,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 			const output = tallyBus.outputs?.[outputIdx]
 			if (!output || !output.tallyColor) return {}
 
-			const bgColor = TALLY_COLORS[output.tallyColor as keyof typeof TALLY_COLORS] ?? TALLY_COLORS.off
+			const bgColor = TALLY_COLORS[output.tallyColor] ?? TALLY_COLORS.off
 			const textColor =
 				output.tallyColor === 'green' || output.tallyColor === 'yellow' ? TEXT_COLORS.dark : TEXT_COLORS.light
 
@@ -925,6 +929,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 	// User's selected module output tally color
 	feedbacks['route_tally_color_user'] = {
 		type: 'advanced',
+		affectedProperties: ['bgcolor', 'color', 'imageBuffer'],
 		name: 'User Routing: Output Tally Color',
 		description: "Shows the tally color of the output on user's selected module",
 		options: [
@@ -958,7 +963,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 			const output = tallyBus.outputs?.[outputIdx]
 			if (!output || !output.tallyColor) return {}
 
-			const bgColor = TALLY_COLORS[output.tallyColor as keyof typeof TALLY_COLORS] ?? TALLY_COLORS.off
+			const bgColor = TALLY_COLORS[output.tallyColor] ?? TALLY_COLORS.off
 			const textColor =
 				output.tallyColor === 'green' || output.tallyColor === 'yellow' ? TEXT_COLORS.dark : TEXT_COLORS.light
 
@@ -1047,5 +1052,15 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 		},
 	}
 
-	self.setFeedbackDefinitions(feedbacks)
+	for (const [id, definition] of Object.entries(feedbacks)) {
+		if (!definition || ['user_step_size', 'user_ptz_mode', 'user_ptz_action'].includes(id)) continue
+		if (definition.type === 'boolean') {
+			const booleanCallback = definition.callback
+			definition.callback = async (event, context) => (self.connected ? booleanCallback(event, context) : false)
+		} else if (definition.type === 'advanced') {
+			const advancedCallback = definition.callback
+			definition.callback = async (event, context) => (self.connected ? advancedCallback(event, context) : {})
+		}
+	}
+	self.setFeedbackDefinitions({ ...feedbacks, ...graphicsFeedbacks(self) })
 }

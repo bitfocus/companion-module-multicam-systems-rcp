@@ -2,7 +2,9 @@ import type { CompanionActionDefinitions } from '@companion-module/base'
 import type { ModuleInstance } from './main.js'
 
 export function UpdateActions(self: ModuleInstance): void {
-	const actions: CompanionActionDefinitions = {}
+	const actions: CompanionActionDefinitions<
+		Record<string, { options: import('@companion-module/base').CompanionOptionValues }>
+	> = {}
 
 	// Get current choices
 	const cameraChoices = self.cameraChoices.length > 0 ? self.cameraChoices : [{ id: '', label: 'No cameras available' }]
@@ -256,7 +258,6 @@ export function UpdateActions(self: ModuleInstance): void {
 				label: 'User (for user setting)',
 				choices: userChoices,
 				default: userChoices[0]?.id || '',
-				isVisible: (options) => options.step_size === 'user_setting',
 			},
 		],
 		callback: async (action) => {
@@ -316,7 +317,6 @@ export function UpdateActions(self: ModuleInstance): void {
 				label: 'User (for user setting)',
 				choices: userChoices,
 				default: userChoices[0]?.id || '',
-				isVisible: (options) => options.step_size === 'user_setting',
 			},
 		],
 		callback: async (action) => {
@@ -487,7 +487,6 @@ export function UpdateActions(self: ModuleInstance): void {
 				label: 'User (for user setting)',
 				choices: userChoices,
 				default: userChoices[0]?.id || '',
-				isVisible: (options) => options.mode === 'user_setting',
 			},
 		],
 		callback: async (action) => {
@@ -548,7 +547,6 @@ export function UpdateActions(self: ModuleInstance): void {
 				label: 'User (for user setting)',
 				choices: userChoices,
 				default: userChoices[0]?.id || '',
-				isVisible: (options) => options.mode === 'user_setting',
 			},
 		],
 		callback: async (action) => {
@@ -621,7 +619,6 @@ export function UpdateActions(self: ModuleInstance): void {
 				label: 'User (for user settings)',
 				choices: userChoices,
 				default: userChoices[0]?.id || '',
-				isVisible: (options) => options.action === 'user_setting' || options.mode === 'user_setting',
 			},
 		],
 		callback: async (action) => {

@@ -1,17 +1,25 @@
+import { cloudConnection } from './cloud.js'
 import {
 	InstanceBase,
-	runEntrypoint,
+	type InstanceTypes,
 	InstanceStatus,
 	type SomeCompanionConfigField,
 	type DropdownChoice,
 } from '@companion-module/base'
-import { type ModuleConfig, GetConfigFields } from './config.js'
+import { type ModuleConfig, type ModuleSecrets, GetConfigFields } from './config.js'
 import { UpdateVariableDefinitions, UpdateVariableValues } from './variables.js'
 import { UpgradeScripts } from './upgrades.js'
 import { UpdateActions } from './actions.js'
 import { UpdateFeedbacks } from './feedbacks.js'
 import { UpdatePresets } from './presets.js'
-import { io, type Socket } from 'socket.io-client'
+import {
+	IntegrationApi,
+	ImageFeeds,
+	type State as ApiState,
+	type Camera as ApiCamera,
+	type VideoSource,
+	type Control,
+} from './api.js'
 import type {
 	WebsocketCamerasOutput,
 	User,
@@ -21,11 +29,22 @@ import type {
 	PropertyValue,
 } from './types.js'
 
-export class ModuleInstance extends InstanceBase<ModuleConfig> {
+export type ModuleTypes = InstanceTypes & { config: ModuleConfig; secrets: ModuleSecrets }
+
+export class ModuleInstance extends InstanceBase<ModuleTypes> {
+	variableIds: string[] = []
 	config!: ModuleConfig
+	secrets: ModuleSecrets = {}
 
 	// WebSocket connection
-	socket: Socket | null = null
+	api: IntegrationApi | null = null
+	connected = false
+	apiCameras: ApiCamera[] = []
+	videoSources: VideoSource[] = []
+	images = new ImageFeeds(
+		() => (this.connected && this.config.connection !== 'cloud' ? this.api : null),
+		() => this.checkFeedbacks('live_image'),
+	)
 	reconnect_timer: NodeJS.Timeout | null = null
 	isInitialized = false
 
@@ -76,8 +95,9 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 		super(internal)
 	}
 
-	async init(config: ModuleConfig): Promise<void> {
+	async init(config: ModuleConfig, _isFirstInit: boolean, secrets: ModuleSecrets): Promise<void> {
 		this.config = config
+		this.secrets = secrets || {}
 		this.isInitialized = true
 
 		this.updateStatus(InstanceStatus.Disconnected)
@@ -114,22 +134,14 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 			this.feedbackCheckTimer = null
 		}
 
-		if (this.socket) {
-			this.socket.removeAllListeners()
-			this.socket.disconnect()
-			this.socket = null
-		}
+		this.api?.close()
+		this.images.close()
 	}
 
-	async configUpdated(config: ModuleConfig): Promise<void> {
-		const hostChanged = this.config.host !== config.host
-		const portChanged = this.config.port !== config.port
-
+	async configUpdated(config: ModuleConfig, secrets: ModuleSecrets): Promise<void> {
 		this.config = config
-
-		if (hostChanged || portChanged) {
-			this.initWebSocket()
-		}
+		this.secrets = secrets || {}
+		this.initWebSocket()
 	}
 
 	getConfigFields(): SomeCompanionConfigField[] {
@@ -195,7 +207,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 		this.feedbackCheckTimer = setTimeout(() => {
 			this.feedbackCheckTimer = null
 			if (this.pendingFeedbacks.size > 0) {
-				this.checkFeedbacks(...Array.from(this.pendingFeedbacks))
+				this.checkFeedbacks(Array.from(this.pendingFeedbacks)[0], ...Array.from(this.pendingFeedbacks).slice(1))
 				this.pendingFeedbacks.clear()
 			}
 		}, 30) // 30ms debounce for feedbacks
@@ -226,200 +238,130 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	 * Initialize WebSocket connection to Multicam RCP server
 	 */
 	initWebSocket(): void {
-		if (this.reconnect_timer) {
-			clearTimeout(this.reconnect_timer)
-			this.reconnect_timer = null
-		}
-
-		const ip = this.config.host
-		const port = this.config.port
-
-		if (!ip || !port) {
-			this.updateStatus(InstanceStatus.BadConfig, 'No host and/or port defined')
+		if (this.reconnect_timer) clearTimeout(this.reconnect_timer)
+		this.api?.close()
+		this.api = null
+		this.connected = false
+		this.images.disconnect()
+		this.setVariableValues(Object.fromEntries(this.variableIds.map((id) => [id, null])))
+		this.propertyValues.clear()
+		this.apiCameras = []
+		this.cameras = []
+		this.videoSources = []
+		this.users = []
+		this.tally = []
+		this.checkAllFeedbacks()
+		this.scheduleVariableUpdate()
+		let url: string
+		let token: string | (() => Promise<string>)
+		try {
+			if (this.config.connection === 'cloud') {
+				const cloud = cloudConnection(
+					this.config.cloudUrl || 'https://api.cloud.multicam.systems',
+					this.config.cloudClientId || '',
+					this.secrets.cloudClientSecret || '',
+					this.config.cloudProjectId || '',
+					this.config.cloudInstanceId || '',
+				)
+				url = cloud.url
+				token = cloud.token
+			} else {
+				if (!this.config.host || !this.config.port || !this.secrets.token)
+					throw Error('Host, port and integration token are required')
+				url = `${this.config.tls ? 'https' : 'http'}://${this.config.host}:${this.config.port}`
+				token = this.secrets.token
+			}
+		} catch (error) {
+			this.updateStatus(
+				InstanceStatus.BadConfig,
+				error instanceof Error ? error.message : 'Invalid connection settings',
+			)
 			return
 		}
-
 		this.updateStatus(InstanceStatus.Connecting)
+		const api = new IntegrationApi(
+			url,
+			token,
+			(state) => {
+				if (this.api === api) this.applyApiState(state)
+			},
+			() => {
+				if (this.api !== api) return
+				this.connected = false
+				this.images.disconnect()
+				this.propertyValues.clear()
+				this.invalidateTallyCache()
+				this.checkAllFeedbacks()
+				this.scheduleVariableUpdate()
+				this.updateStatus(InstanceStatus.ConnectionFailure, 'API disconnected; verify host, token and project access')
+				this.maybeReconnect()
+			},
+		)
+		this.api = api
+		api.connect()
+	}
 
-		// Clean up existing socket
-		if (this.socket) {
-			this.socket.removeAllListeners()
-			this.socket.disconnect()
-			this.socket = null
-		}
-
-		// Connect with Socket.IO using the /ws-core path
-		this.socket = io(`http://${ip}:${port}`, {
-			path: '/ws-core',
-			transports: ['websocket', 'polling'],
-			reconnection: false, // We handle reconnection ourselves
+	applyApiState(state: ApiState): void {
+		const topology = JSON.stringify([
+			state.cameras?.map((c) => [
+				c.uuid,
+				c.name,
+				c.controls.map(({ value: _value, actual: _actual, desired: _desired, ...control }) => control),
+			]),
+			state.users,
+			state.routing?.map((bus) => {
+				const b = bus as IModuleTallyBuses
+				return [
+					b.uuid,
+					b.name,
+					Object.entries(b.inputs ?? {}).map(([id, p]) => [id, p.name, p.customName]),
+					Object.entries(b.outputs ?? {}).map(([id, p]) => [id, p.name, p.customName]),
+				]
+			}),
+			state.videoSources,
+		])
+		const changed = this.lastTopology !== topology
+		this.lastTopology = topology
+		this.connected = true
+		this.updateStatus(InstanceStatus.Ok)
+		this.apiCameras = state.cameras ?? []
+		this.videoSources = this.config.connection === 'cloud' ? [] : (state.videoSources ?? [])
+		this.cameras = this.apiCameras.map((camera) => ({
+			...camera,
+			assignedModuleControlProperties: camera.controls.map((c) => c.id),
+		})) as unknown as WebsocketCamerasOutput[]
+		this.users = (state.users ?? []) as User[]
+		this.tally = (state.routing ?? []) as IModuleTallyBuses[]
+		this.propertyValues.clear()
+		this.apiCameras.forEach((camera, index) => {
+			for (const control of camera.controls)
+				this.propertyValues.set(`camera_${index}_${control.id}`, control.value as PropertyValue)
+			this.propertyValues.set(`camera_${index}_tally`, camera.tally as PropertyValue)
 		})
-
-		this.socket.on('connect', () => {
-			this.log('info', `Connected to Multicam RCP at ${ip}:${port}`)
-			this.updateStatus(InstanceStatus.Ok)
-
-			// Request initial data
-			this.socket?.emit('getCameras')
-			this.socket?.emit('getUsers')
-			this.socket?.emit('getTally')
-			this.socket?.emit('getModules')
-		})
-
-		this.socket.on('disconnect', (reason) => {
-			this.log('warn', `Disconnected from server: ${reason}`)
-			this.updateStatus(InstanceStatus.Disconnected, `Disconnected: ${reason}`)
-			this.maybeReconnect()
-		})
-
-		this.socket.on('connect_error', (error) => {
-			this.log('error', `Connection error: ${error.message}`)
-			this.updateStatus(InstanceStatus.ConnectionFailure, error.message)
-			this.maybeReconnect()
-		})
-
-		// Handle cameras data
-		this.socket.on('cameras', (data: WebsocketCamerasOutput[]) => {
-			if (this.config.debug_messages) {
-				this.log('debug', `Received cameras: ${JSON.stringify(data).substring(0, 200)}...`)
-			}
-			this.cameras = data
-			this.invalidateTallyCache() // Tally may have changed with camera updates
+		this.invalidateTallyCache()
+		this.scheduleVariableUpdate()
+		this.checkAllFeedbacks()
+		if (changed) {
 			this.updateCameraChoices()
 			this.updatePropertyChoices()
-			this.subscribeToPropertyUpdates()
-			this.requestInitialPropertyValues() // Request current values for all cameras
-			this.updateVariableDefinitions()
-			this.scheduleUiRebuild() // Debounced UI rebuild
-			this.scheduleFeedbackCheck('camera_tally_program', 'camera_tally_preview', 'camera_tally_color')
-		})
-
-		// Handle users data
-		this.socket.on('users', (data: User[]) => {
-			// Always log users for debugging category issues
-			this.log('info', `Received ${data.length} users: ${data.map((u) => u.name).join(', ')}`)
-			this.users = data
-			// Update user choices for action dropdowns
-			this.userChoices = this.users.map((user) => ({
-				id: user.uuid,
-				label: user.name || user.uuid,
-			}))
-			if (this.userChoices.length === 0) {
-				this.userChoices = [{ id: '', label: 'No users available' }]
-			}
-			this.updateCameraChoices() // Re-update camera choices as user assignments may have changed
-			this.updateVariableDefinitions() // Update variable definitions with new user variables
-			this.scheduleUiRebuild() // Debounced UI rebuild
-			this.scheduleVariableUpdate() // Debounced variable update
-			this.scheduleFeedbackCheck(
-				'user_previewing_camera',
-				'any_user_previewing_camera',
-				'camera_status',
-				'user_preview_indicator',
-			)
-		})
-
-		// Handle tally data
-		this.socket.on('tally', (data: IModuleTallyBuses[]) => {
-			if (this.config.debug_messages) {
-				this.log('debug', `Received tally: ${JSON.stringify(data).substring(0, 200)}...`)
-			}
-			this.tally = data
-			this.invalidateTallyCache() // Clear cache when tally changes
-			this.scheduleVariableUpdate() // Update tally variables
-			// Check all routing-related feedbacks when routes change
-			this.scheduleFeedbackCheck(
-				'camera_tally_program',
-				'camera_tally_preview',
-				'camera_tally_color',
-				'route_active',
-				'route_tally_color',
-				'route_source_active_static',
-				'route_destination_selected_static',
-				'route_source_active_for_user',
-				'route_destination_selected_user',
-				'route_tally_color_user',
-			)
-			// Rebuild UI when router topology changes (new inputs/outputs)
-			this.scheduleUiRebuild()
-		})
-
-		// Handle modules data
-		this.socket.on('modules', (data: WebsocketModulesSend[]) => {
-			if (this.config.debug_messages) {
-				this.log('debug', `Received modules: ${JSON.stringify(data).substring(0, 200)}...`)
-			}
-			this.modules = data
 			this.updateModuleChoices()
-			this.scheduleUiRebuild() // Only rebuild UI, not feedbacks
-		})
+			this.userChoices = this.users.map((u) => ({ id: u.uuid, label: u.name }))
+			this.updateVariableDefinitions()
+			this.scheduleUiRebuild()
+		}
 	}
-
-	/**
-	 * Request initial property values for all cameras
-	 */
-	requestInitialPropertyValues(): void {
-		if (!this.socket) return
-
-		this.cameras.forEach((camera) => {
-			// Request basic properties
-			;['name', 'id', 'tally'].forEach((property) => {
-				this.socket?.emit('get-node', { uuid: camera.uuid, property })
-			})
-
-			// Request all assigned module properties
-			const properties = camera.assignedModuleControlProperties || []
-			properties.forEach((property) => {
-				this.socket?.emit('get-node', { uuid: camera.uuid, property })
-			})
-		})
+	private lastTopology = ''
+	control(cameraId: string, controlId: string): Control | undefined {
+		return this.apiCameras.find((c) => c.uuid === cameraId)?.controls.find((c) => c.id === controlId)
 	}
-
-	/**
-	 * Subscribe to property update events for all cameras
-	 */
-	subscribeToPropertyUpdates(): void {
-		if (!this.socket) return
-
-		// Remove old listeners first
-		this.cameras.forEach((camera) => {
-			const properties = camera.assignedModuleControlProperties || []
-			properties.forEach((property) => {
-				this.socket?.off(`node::${camera.uuid}::${property}`)
-			})
-		})
-
-		// Add new listeners
-		this.cameras.forEach((camera, index) => {
-			const properties = camera.assignedModuleControlProperties || []
-			properties.forEach((property) => {
-				this.socket?.on(`node::${camera.uuid}::${property}`, (value: PropertyValue) => {
-					const varKey = `camera_${index}_${property}`
-					this.propertyValues.set(varKey, value)
-					this.scheduleVariableUpdate() // Debounced
-
-					// Check property_bool feedback for all boolean-like properties
-					if (this.isBooleanProperty(property)) {
-						this.scheduleFeedbackCheck('property_bool')
-					}
-				})
-			})
-
-			// Also subscribe to basic camera properties
-			;['name', 'id', 'tally'].forEach((property) => {
-				this.socket?.on(`node::${camera.uuid}::${property}`, (value: PropertyValue) => {
-					const varKey = `camera_${index}_${property}`
-					this.propertyValues.set(varKey, value)
-					this.scheduleVariableUpdate() // Debounced
-
-					// If tally changed, recheck tally feedbacks
-					if (property === 'tally') {
-						this.invalidateTallyCache()
-						this.scheduleFeedbackCheck('camera_tally_program', 'camera_tally_preview', 'camera_tally_color')
-					}
-				})
-			})
-		})
+	command(operation: Record<string, unknown>): void {
+		if (!this.connected || !this.api) {
+			this.log('warn', 'Not connected')
+			return
+		}
+		void this.api
+			.command(operation)
+			.catch((error) => this.log('warn', error instanceof Error ? error.message : 'Command failed'))
 	}
 
 	/**
@@ -496,41 +438,14 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	 * Check if a property is likely a boolean based on naming convention
 	 */
 	isBooleanProperty(prop: string): boolean {
-		const booleanPatterns = [
-			'auto_',
-			'enable',
-			'show_',
-			'hide_',
-			'flip_',
-			'mirror_',
-			'color_bars',
-			'osd_',
-			'_on',
-			'_off',
-			'mute',
-		]
-		const lowerProp = prop.toLowerCase()
-		return booleanPatterns.some((pattern) => lowerProp.includes(pattern))
+		return this.apiCameras.some((c) => c.controls.some((v) => v.id === prop && v.type === 'boolean'))
 	}
 
 	/**
 	 * Check if a property is likely an enum based on naming convention
 	 */
 	isEnumProperty(prop: string): boolean {
-		const enumPatterns = [
-			'_mode',
-			'_format',
-			'_preset',
-			'_scene',
-			'_matrix',
-			'_balance',
-			'nd_filter',
-			'shutter_mode',
-			'white_balance_mode',
-			'tally',
-		]
-		const lowerProp = prop.toLowerCase()
-		return enumPatterns.some((pattern) => lowerProp.includes(pattern))
+		return this.apiCameras.some((c) => c.controls.some((v) => v.id === prop && v.type === 'enum'))
 	}
 
 	/**
@@ -610,60 +525,64 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	 * Send a node update to set a camera property
 	 */
 	setProperty(cameraUuid: string, property: string, value: PropertyValue): void {
-		if (!this.socket) {
-			this.log('error', 'Cannot set property: not connected')
+		const preset = /^(recall|store|clear)_preset(?:_(scene|tracing))?$/.exec(property)
+		if (preset) {
+			if (preset[2] === 'tracing') {
+				this.log('warn', 'This preset operation is not available in the API preview')
+				return
+			}
+			this.command({
+				type: ({ recall: 'presetRecall', store: 'presetStore', clear: 'presetClear' } as Record<string, string>)[
+					preset[1]
+				],
+				cameraId: cameraUuid,
+				kind: preset[2] || 'ptz',
+				number: Number(value) - 1,
+			})
 			return
 		}
-
-		if (this.config.debug_messages) {
-			this.log('debug', `Setting ${property} on ${cameraUuid} to ${JSON.stringify(value)}`)
-		}
-
-		this.socket.emit('node-update', [cameraUuid, property, value])
-	}
-
-	/**
-	 * Increase a camera property value
-	 */
-	increaseProperty(cameraUuid: string, property: string, substep = false, bigstep = false): void {
-		if (!this.socket) {
-			this.log('error', 'Cannot increase property: not connected')
+		const control = this.control(cameraUuid, property)
+		if (!control?.writable || !control.resolvedCameraId) {
+			this.log('warn', 'Control unavailable')
 			return
 		}
-
-		this.socket.emit('increase-property', { uuid: cameraUuid, property, substep, bigstep })
-	}
-
-	/**
-	 * Decrease a camera property value
-	 */
-	decreaseProperty(cameraUuid: string, property: string, substep = false, bigstep = false): void {
-		if (!this.socket) {
-			this.log('error', 'Cannot decrease property: not connected')
-			return
-		}
-
-		this.socket.emit('decrease-property', { uuid: cameraUuid, property, substep, bigstep })
-	}
-
-	/**
-	 * Set a route on a module
-	 */
-	setRoute(moduleUuid: string, sourceIndex: number, destinationIndex: number): void {
-		if (!this.socket) {
-			this.log('error', 'Cannot set route: not connected')
-			return
-		}
-
-		if (this.config.debug_messages) {
-			this.log('debug', `Setting route: ${sourceIndex} -> ${destinationIndex} on ${moduleUuid}`)
-		}
-
-		this.socket.emit('setRoute', {
-			moduleUuid,
-			sourceIndex,
-			destinationIndex,
+		this.command({
+			type: 'controlSet',
+			cameraId: cameraUuid,
+			controlId: property,
+			value,
+			expectedCameraId: control.resolvedCameraId,
 		})
+	}
+	private stepProperty(
+		cameraUuid: string,
+		property: string,
+		direction: number,
+		substep: boolean,
+		bigstep: boolean,
+	): void {
+		const control = this.control(cameraUuid, property)
+		if (!control?.writable || !control.resolvedCameraId) {
+			this.log('warn', 'Control unavailable')
+			return
+		}
+		this.command({
+			type: 'controlAdjust',
+			cameraId: cameraUuid,
+			controlId: property,
+			direction,
+			step: substep ? 'small' : bigstep ? 'big' : 'normal',
+			expectedCameraId: control.resolvedCameraId,
+		})
+	}
+	increaseProperty(cameraUuid: string, property: string, substep = false, bigstep = false): void {
+		this.stepProperty(cameraUuid, property, 1, substep, bigstep)
+	}
+	decreaseProperty(cameraUuid: string, property: string, substep = false, bigstep = false): void {
+		this.stepProperty(cameraUuid, property, -1, substep, bigstep)
+	}
+	setRoute(moduleUuid: string, sourceIndex: number, destinationIndex: number): void {
+		this.command({ type: 'routeSet', busId: moduleUuid, input: sourceIndex, output: destinationIndex })
 	}
 
 	/**
@@ -718,19 +637,7 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	 * Trigger user preview button press (select camera for user)
 	 */
 	userPreviewCamera(userUuid: string, cameraUuid: string | null): void {
-		if (!this.socket) {
-			this.log('error', 'Cannot preview camera: not connected')
-			return
-		}
-
-		if (this.config.debug_messages) {
-			this.log('debug', `User ${userUuid} previewing camera ${cameraUuid}`)
-		}
-
-		this.socket.emit('camera_preview_down', {
-			userUuid,
-			cameraUuid,
-		})
+		if (cameraUuid) this.command({ type: 'previewSelect', userId: userUuid, cameraId: cameraUuid })
 	}
 
 	// ===== User Routing State =====
@@ -866,4 +773,5 @@ export class ModuleInstance extends InstanceBase<ModuleConfig> {
 	}
 }
 
-runEntrypoint(ModuleInstance, UpgradeScripts)
+export default ModuleInstance
+export { UpgradeScripts }

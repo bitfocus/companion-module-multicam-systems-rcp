@@ -1,174 +1,63 @@
-# Multicam RCP - Companion Module
+# Multicam RCP
 
-Control your broadcast cameras, manage tally signals, PTZ presets, and video routing through Multicam RCP.
+## Connect
 
-## Configuration
+This beta requires Companion 5 and an RCP build exposing API `1.0-preview`.
 
-### Connection Settings
+- **Target IP / Port:** your RCP server, default `127.0.0.1:5994`. Existing saved ports are preserved.
+- **Integration API token:** a project-scoped token issued by your RCP administrator. Use `monitor`, `control`, `routing` and `images` scopes for all features. Companion stores it as a secret.
+- **Use HTTPS / WSS:** enable for a server providing HTTPS; use that server's HTTPS port.
+- **Auto Reconnect:** retry after five seconds when disconnected.
 
-- **Target IP**: The IP address of your Multicam RCP server (default: `127.0.0.1`)
-- **Port**: The port of your Multicam RCP server (default: `3000`)
-- **Control as User**: Select which user profile to control cameras as. The previewed camera of this user will be the default control target.
-- **Auto Reconnect**: Automatically reconnect if the connection is lost
-- **Debug Messages**: Enable detailed logging of WebSocket communication
+Tokens expire and can be revoked. Changing the active RCP project requires a token
+for that project. Old Socket.IO-only servers are not supported by this beta.
 
-## Features
+## Controls and presets
 
-### Camera Control
+Controls use discovered camera IDs and available properties. Numeric increment/decrement
+runs against current server state, with the server's small/normal/big steps. User camera
+selection, routing, and PTZ/scene preset recall/store/clear use the same owners as the RCP app.
 
-- Set camera properties (iris, gain, pedestal, etc.) to absolute values
-- Adjust properties relative to current value
-- Server-side increment/decrement with configurable step sizes
-- Quick access buttons for common adjustments
+**Continuous movement and tracing are unavailable in the API preview.** Requests are
+rejected explicitly. PTZ preset recall remains available. Camera readback is separate
+from command admission; accepting a command does not prove that hardware completed it.
 
-### PTZ Presets
+Preset actions use human-facing numbers 1–1000, mapped to API slots 0–999.
 
-- Recall stored PTZ presets (1-1000)
-- Store new PTZ presets
-- Clear PTZ presets
+Existing action and feedback IDs are retained. The new **Control gauges** preset section
+uses the server's numeric range and cached/project value. Rotate a Stream Deck + dial
+left/right to adjust a writable control. A disconnected gauge shows Offline.
 
-### User-Based Control
+## Live video
 
-- Select which camera a user is previewing
-- Camera selection follows the configured user's preview
-- Multiple users can preview different cameras simultaneously
+The **Live video · 16:9** section provides one preset per discovered video source. Each
+uses the whole key width, preserves 16:9 and leaves space for its label. Its image is a
+local value feedback; JPEGs are not saved into button configuration on each frame.
 
-### Tally Feedback
+Defaults: **160×90, 10 fps, JPEG quality 65**. Edit the Live video image feedback to choose
+16–640 × 16–360 pixels, 1–15 fps and quality 20–90. Higher resolutions and rates consume
+more bandwidth and processing. Matching source/profile feedbacks share one subscription;
+the backend can share capture/decoding with other consumers. The final feedback being
+disabled or removed releases demand. Hidden-page behavior follows Companion's feedback lifecycle.
 
-- Program tally (red) indication
-- Preview tally (green) indication
-- Dynamic tally color feedback
-- Support for all tally colors (red, green, blue, yellow, purple)
+Images clear on disconnect or after two seconds without a new frame. Keep RCP and
+Companion clocks synchronized; images older than two seconds are discarded. Capture/source
+changes reconnect after a short delay. The first API preview accepts configured source
+IDs, not camera monitoring aliases or route-following crops.
 
-### Video Routing
+Local acceptance on Companion 5 rendered about 10 fps for one animated native test
+source at 160×90. This is not a maximum supported source count, a real-camera benchmark
+or a new physical Stream Deck throughput measurement.
 
-- Route video sources to destinations on supported routers/switchers
-- Integrates with Blackmagic Videohub, ATEM, and other supported devices
+## Cloud connection preview
 
-## Actions
-
-### Camera Control
-
-- **Set Camera Property**: Set a property to an absolute value
-- **Adjust Camera Property (Relative)**: Add/subtract from current value
-- **Increase/Decrease Camera Property**: Use server-side step logic
-
-### Quick Controls
-
-- Iris +/-
-- Gain +/-
-- Pedestal +/-
-- Zoom +/-
-- Focus +/-
-- Saturation +/-
-- Contrast +/-
-- Sharpness +/-
-
-### Toggles
-
-- Toggle Auto Iris
-- Toggle Auto Focus
-- Toggle Color Bars
-
-### PTZ
-
-- Recall PTZ Preset
-- Store PTZ Preset
-- Clear PTZ Preset
-
-### Users
-
-- Select Camera for User Preview
-- Clear User Preview
-
-### Routing
-
-- Set Video Route
-
-## Feedbacks
-
-### Tally
-
-- Camera Tally: Program (Red)
-- Camera Tally: Preview (Green)
-- Camera Tally: Any Active
-- Camera Tally: Dynamic Color
-
-### Users
-
-- User Previewing Camera
-- Selected User Previewing Camera
-- Any User Previewing Camera
-
-### Connection
-
-- Connected to Server
-
-### Properties
-
-- Property Equals Value
-- Property Greater Than
-- Auto Iris Enabled
-- Auto Focus Enabled
-- Color Bars Enabled
-
-## Variables
-
-### Global
-
-- `$(multicam-rcp:connected)` - Connection status
-- `$(multicam-rcp:camera_count)` - Number of cameras
-- `$(multicam-rcp:user_count)` - Number of users
-- `$(multicam-rcp:selected_user_name)` - Selected user name
-- `$(multicam-rcp:selected_user_preview_camera)` - Camera the selected user is previewing
-
-### Per Camera (replace X with camera index 0, 1, 2...)
-
-- `$(multicam-rcp:camera_X_name)` - Camera name
-- `$(multicam-rcp:camera_X_id)` - Camera ID
-- `$(multicam-rcp:camera_X_uuid)` - Camera UUID
-- `$(multicam-rcp:camera_X_tally)` - Tally state
-- `$(multicam-rcp:camera_X_tally_color)` - Tally color
-- `$(multicam-rcp:camera_X_{property})` - Any camera property value
-
-### Per User (replace X with user index 0, 1, 2...)
-
-- `$(multicam-rcp:user_X_name)` - User name
-- `$(multicam-rcp:user_X_preview_camera)` - Camera the user is previewing
-
-## Presets
-
-The module provides auto-generated presets for quick setup:
-
-### Camera Selectors
-
-- Buttons for each camera with tally feedback
-- Click to set as the selected user's preview camera
-
-### Camera Tally Indicators
-
-- Display buttons showing camera name and tally state
-
-### PTZ Presets
-
-- Buttons for presets 1-10 per camera
-- Buttons for presets 1-10 following selected camera
-
-### Quick Controls
-
-- Increase/decrease buttons for common properties
-
-### Toggles
-
-- Auto Iris, Auto Focus, Color Bars toggle buttons
-
-### Status
-
-- Connection status indicator
-- Camera count display
-- Selected user preview display
-
-## Support
-
-For issues and feature requests, please visit:
-https://github.com/bitfocus/companion-module-multicam-systems-rcp/issues
+Select **Multicam Cloud (preview)** and enter the cloud API HTTPS origin, integration
+client ID/secret, project ID and exact target instance ID. Use a project integration
+client created through `/control/v1/clients` with `monitor` and the required `control`/
+`routing` scopes. General organization API credentials are a separate credential type.
+The module exchanges the secret for short-lived tokens and renews them in memory.
+Revocation or loss of the selected instance disconnects the module; it never switches
+targets automatically. Discovery, controls and gauges use the same API as local RCP.
+Cloud live-video presets are unavailable until the cloud media transport is implemented.
+Requires the matching cloud/RCP integration preview rollout; local fixture tests do not
+establish production cloud readiness.

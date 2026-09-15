@@ -3,18 +3,18 @@ import type {
 	CompanionUpgradeContext,
 	CompanionStaticUpgradeProps,
 } from '@companion-module/base'
-import type { ModuleConfig } from './config.js'
+import type { ModuleConfig, ModuleSecrets } from './config.js'
 
 /**
  * Upgrade scripts for migrating from older versions of the module
  */
-export const UpgradeScripts: CompanionStaticUpgradeScript<ModuleConfig>[] = [
+export const UpgradeScripts: CompanionStaticUpgradeScript<ModuleConfig, ModuleSecrets>[] = [
 	// v0.x to v1.0.0 - Major rewrite for Companion v4
 	// Old configs will be reset as the module structure has completely changed
 	function v0_to_v1(
 		_context: CompanionUpgradeContext<ModuleConfig>,
-		props: CompanionStaticUpgradeProps<ModuleConfig>,
-	): ReturnType<CompanionStaticUpgradeScript<ModuleConfig>> {
+		props: CompanionStaticUpgradeProps<ModuleConfig, ModuleSecrets>,
+	): ReturnType<CompanionStaticUpgradeScript<ModuleConfig, ModuleSecrets>> {
 		const result = {
 			updatedConfig: null as ModuleConfig | null,
 			updatedActions: [],
@@ -37,5 +37,16 @@ export const UpgradeScripts: CompanionStaticUpgradeScript<ModuleConfig>[] = [
 		}
 
 		return result
+	},
+	function v1_to_v2(
+		_context: CompanionUpgradeContext<ModuleConfig>,
+		props: CompanionStaticUpgradeProps<ModuleConfig, ModuleSecrets>,
+	): ReturnType<CompanionStaticUpgradeScript<ModuleConfig, ModuleSecrets>> {
+		// Keep saved host/port/action IDs. Authentication is newly required.
+		return {
+			updatedConfig: props.config ? { ...props.config, tls: props.config.tls ?? false } : null,
+			updatedActions: [],
+			updatedFeedbacks: [],
+		}
 	},
 ]
