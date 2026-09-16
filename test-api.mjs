@@ -176,3 +176,81 @@ test('cloud credentials are cached and requests retain the project/instance pref
 	socket.terminate()
 	await new Promise((resolve) => server.close(resolve))
 })
+
+test('controller presets select discovered choices at the current generation and show effective parent choices', async () => {
+	const { controllerActions, controllerFeedbacks, controllerPresets, controllerSelection } =
+		await import('./dist/controllers.js')
+	const state = {
+		generation: 8,
+		switchers: [
+			{
+				id: 'operator',
+				name: 'Operator',
+				selectedChoiceId: 'a',
+				choices: [
+					{ id: 'a', name: 'Studio A' },
+					{ id: 'b', name: 'Studio B' },
+				],
+			},
+		],
+		assignments: [{ switcherId: 'operator', slotId: 'camera', effectiveChoiceId: 'b' }],
+	}
+	const key = JSON.stringify(['operator', 'b'])
+	const sent = [],
+		warnings = []
+	const host = {
+		connected: true,
+		controllerSwitchers: state,
+		command: (op) => sent.push(op),
+		log: (_level, message) => warnings.push(message),
+	}
+	const actions = controllerActions(host),
+		feedbacks = controllerFeedbacks(host),
+		presets = controllerPresets(host)
+	assert.equal(Object.keys(presets).length, 2)
+	const preset = Object.values(presets).find((p) => p.name === 'Select Studio B')
+	assert.equal(preset.steps[0].down[0].actionId, 'controller_select')
+	await actions.controller_select.callback({ options: preset.steps[0].down[0].options })
+	assert.deepEqual(sent[0], { type: 'controllerSelect', switcherId: 'operator', choiceId: 'b', expectedGeneration: 8 })
+	assert.equal(feedbacks.controller_selected.callback({ options: { choice: key } }), true)
+	assert.equal(
+		feedbacks.controller_selected.callback({ options: { choice: JSON.stringify(['operator', 'a']) } }),
+		false,
+	)
+	state.generation = 9
+	await actions.controller_select.callback({ options: { choice: key } })
+	assert.equal(sent[1].expectedGeneration, 9)
+	host.connected = false
+	assert.equal(feedbacks.controller_selected.callback({ options: { choice: key } }), false)
+	await actions.controller_select.callback({ options: { choice: key } })
+	assert.equal(sent.length, 2)
+	for (const invalid of ['', 'bad-json', JSON.stringify(['operator', 'removed']), JSON.stringify(['operator']), 42])
+		assert.equal(controllerSelection(state, invalid), null)
+	assert.equal(controllerSelection(undefined, key), null)
+	assert.equal(warnings.length, 1)
+})
+
+test('preset commands carry the current controller generation and fail closed without it', async () => {
+	const { ModuleInstance } = await import('./dist/main.js')
+	const sent = [],
+		warnings = []
+	const host = {
+		controllerSwitchers: { generation: 12 },
+		command: (op) => sent.push(op),
+		log: (_level, message) => warnings.push(message),
+	}
+	for (const operation of ['recall', 'store', 'clear']) {
+		ModuleInstance.prototype.setProperty.call(host, 'logical-slot', `${operation}_preset`, 3)
+		assert.deepEqual(sent.at(-1), {
+			type: `preset${operation[0].toUpperCase() + operation.slice(1)}`,
+			cameraId: 'logical-slot',
+			kind: 'ptz',
+			number: 2,
+			expectedGeneration: 12,
+		})
+	}
+	host.controllerSwitchers = undefined
+	ModuleInstance.prototype.setProperty.call(host, 'logical-slot', 'recall_preset', 3)
+	assert.equal(sent.length, 3)
+	assert.equal(warnings.length, 1)
+})

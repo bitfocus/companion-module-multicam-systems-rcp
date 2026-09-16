@@ -26,6 +26,7 @@ export interface Camera {
 	id: number
 	displayName: string
 	virtualCameraEnable: boolean
+	controllerSwitcherSlot?: { switcherId: string; slotId: string }
 	controls: Control[]
 	tally: unknown
 	presets: { kind: string; number: number; name: string | null }[]
@@ -35,7 +36,40 @@ export interface VideoSource {
 	name?: string
 	type: string
 }
+export type ControlKind = 'camera' | 'vision' | 'audio' | 'companion'
+export type ControlTarget =
+	| { type: 'camera'; cameraId: string }
+	| { type: 'vision'; moduleId: string; busId: string; programOutput: number; previewOutput: number }
+	| { type: 'audio'; moduleId: string; busId: string }
+	| { type: 'companion'; moduleId: string }
+	| { type: 'switcher'; switcherId: string; slotId: string; choiceId?: string }
+export interface ControllerState {
+	generation: number
+	switchers: {
+		id: string
+		name: string
+		ownerUserId?: string
+		virtualCameraMode: boolean
+		embedded: boolean
+		slots: { id: string; name: string; kind: ControlKind; optional: boolean; controllerModuleIds: string[] }[]
+		choices: { id: string; name: string; targets: Record<string, ControlTarget | null> }[]
+		selectedChoiceId: string
+	}[]
+	assignments: {
+		switcherId: string
+		slotId: string
+		effectiveChoiceId: string
+		kind: ControlKind
+		generation: number
+		target: ControlTarget | null
+		path: string[]
+		controllerModuleIds: string[]
+		optional: boolean
+		readiness: { assigned: boolean; controllers: { id: string; status: string | null }[] }
+	}[]
+}
 export interface State {
+	controllerSwitchers?: ControllerState
 	cameras?: Camera[]
 	users?: unknown[]
 	routing?: unknown[]

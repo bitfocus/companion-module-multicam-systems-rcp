@@ -1,3 +1,4 @@
+import { controllerPresets } from './controllers.js'
 import { addGraphicsPresets } from './graphics.js'
 import {
 	combineRgb,
@@ -705,64 +706,14 @@ export function UpdatePresets(self: ModuleInstance): void {
 	// One folder per user with camera selection, step size, and PTZ modes
 	// ===================
 
-	const physicalCameras = self.cameras.filter((camera) => !camera.virtualCameraEnable)
+	Object.assign(presets, controllerPresets(self))
 
 	self.users.forEach((user, userIndex) => {
 		const userNum = userIndex + 1
 		const userName = user.name || `User ${userNum}`
 		const userUuid = user.uuid
 		const userIdShort = userUuid.substring(0, 8)
-		const folderName = `User camera select: ${userName}`
-
-		// ===================
-		// Camera Selection Buttons
-		// ===================
-
-		physicalCameras.forEach((camera, physicalIndex) => {
-			const originalIndex = self.cameras.findIndex((c) => c.uuid === camera.uuid)
-			const camNum = originalIndex + 1
-			const cameraName = camera.name || `CAM ${physicalIndex + 1}`
-			const cameraUuid = camera.uuid
-			const camIdShort = cameraUuid.substring(0, 8)
-
-			presets[`user_${userIdShort}_cam_${camIdShort}`] = {
-				type: 'simple',
-				category: folderName,
-				name: `Select ${cameraName}`,
-				style: {
-					text: `$(multicam-rcp:camera_${camNum}_name)`,
-					size: 'auto',
-					color: COLORS.white,
-					bgcolor: COLORS.darkGray,
-				},
-				steps: [
-					{
-						down: [
-							{
-								actionId: 'select_user_preview',
-								options: { user: userUuid, camera: cameraUuid },
-							},
-						],
-						up: [],
-					},
-				],
-				feedbacks: [
-					{
-						feedbackId: 'camera_tally_color',
-						options: { camera: cameraUuid, set_off_color: false },
-					},
-					{
-						feedbackId: 'user_preview_indicator',
-						options: {
-							user: userUuid,
-							camera: cameraUuid,
-							border_width: 4,
-							indicator_color: COLORS.white,
-						},
-					},
-				],
-			}
-		})
+		const folderName = `User controls: ${userName}`
 
 		// ===================
 		// Step Size Selector

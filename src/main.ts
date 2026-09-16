@@ -19,6 +19,7 @@ import {
 	type Camera as ApiCamera,
 	type VideoSource,
 	type Control,
+	type ControllerState,
 } from './api.js'
 import type {
 	WebsocketCamerasOutput,
@@ -40,6 +41,7 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 	api: IntegrationApi | null = null
 	connected = false
 	apiCameras: ApiCamera[] = []
+	controllerSwitchers: ControllerState | undefined
 	videoSources: VideoSource[] = []
 	images = new ImageFeeds(
 		() => (this.connected && this.config.connection !== 'cloud' ? this.api : null),
@@ -246,6 +248,7 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 		this.setVariableValues(Object.fromEntries(this.variableIds.map((id) => [id, null])))
 		this.propertyValues.clear()
 		this.apiCameras = []
+		this.controllerSwitchers = undefined
 		this.cameras = []
 		this.videoSources = []
 		this.users = []
@@ -319,12 +322,14 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 				]
 			}),
 			state.videoSources,
+			state.controllerSwitchers?.switchers.map(({ selectedChoiceId: _selection, ...definition }) => definition),
 		])
 		const changed = this.lastTopology !== topology
 		this.lastTopology = topology
 		this.connected = true
 		this.updateStatus(InstanceStatus.Ok)
 		this.apiCameras = state.cameras ?? []
+		this.controllerSwitchers = state.controllerSwitchers
 		this.videoSources = this.config.connection === 'cloud' ? [] : (state.videoSources ?? [])
 		this.cameras = this.apiCameras.map((camera) => ({
 			...camera,
@@ -531,7 +536,13 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 				this.log('warn', 'This preset operation is not available in the API preview')
 				return
 			}
+			const expectedGeneration = this.controllerSwitchers?.generation
+			if (!Number.isSafeInteger(expectedGeneration)) {
+				this.log('warn', 'Controller assignment state unavailable')
+				return
+			}
 			this.command({
+				expectedGeneration,
 				type: ({ recall: 'presetRecall', store: 'presetStore', clear: 'presetClear' } as Record<string, string>)[
 					preset[1]
 				],
@@ -631,13 +642,6 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 		this.userPtzActions.set(userUuid, action)
 		this.log('info', `Set PTZ action for user ${userUuid} to ${action}`)
 		this.checkFeedbacks('user_ptz_action')
-	}
-
-	/**
-	 * Trigger user preview button press (select camera for user)
-	 */
-	userPreviewCamera(userUuid: string, cameraUuid: string | null): void {
-		if (cameraUuid) this.command({ type: 'previewSelect', userId: userUuid, cameraId: cameraUuid })
 	}
 
 	// ===== User Routing State =====

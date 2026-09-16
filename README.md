@@ -38,3 +38,15 @@ targets automatically. Discovery, controls and gauges use the same API as local 
 Cloud live-video presets are unavailable until the cloud media transport is implemented.
 Requires the matching cloud/RCP integration preview rollout; local fixture tests do not
 establish production cloud readiness.
+
+### Controller Switchers (2.0.0-beta.3)
+
+Use **Controller: Select Choice** or the generated **Controller choices** presets to
+select configured camera, vision, audio and Companion assignments, including nested
+studio choices. Feedback shows the effective choice imposed by a parent switcher.
+Selections use the current assignment generation; a conflicting edit requires fresh
+state and a new operator selection. No routing or mixer scene is recalled.
+
+Configure switchers in Multicam first. This pre-release cutover replaces the former
+User Select/Clear Camera actions and their automatically generated per-camera buttons.
+There is no project/preset migration. Gauges and live video presets remain available.

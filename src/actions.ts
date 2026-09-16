@@ -1,3 +1,4 @@
+import { controllerActions } from './controllers.js'
 import type { CompanionActionDefinitions } from '@companion-module/base'
 import type { ModuleInstance } from './main.js'
 
@@ -25,17 +26,6 @@ export function UpdateActions(self: ModuleInstance): void {
 		self.enumPropertyChoices.length > 0 ? self.enumPropertyChoices : [{ id: '', label: 'No enum properties available' }]
 
 	const moduleChoices = self.moduleChoices.length > 0 ? self.moduleChoices : [{ id: '', label: 'No modules available' }]
-
-	// Filter out virtual cameras for user preview selection
-	const physicalCameraChoices = self.cameras
-		.filter((camera) => !camera.virtualCameraEnable)
-		.map((camera) => ({
-			id: camera.uuid,
-			label: camera.name || `Camera`,
-		}))
-	if (physicalCameraChoices.length === 0) {
-		physicalCameraChoices.push({ id: '', label: 'No cameras available' })
-	}
 
 	// ===================
 	// Boolean Property Actions
@@ -682,57 +672,7 @@ export function UpdateActions(self: ModuleInstance): void {
 	// User Actions
 	// ===================
 
-	actions['select_user_preview'] = {
-		name: 'User: Select Camera',
-		description: 'Set which camera a user is previewing/controlling',
-		options: [
-			{
-				id: 'user',
-				type: 'dropdown',
-				label: 'User',
-				choices: userChoices,
-				default: userChoices[0]?.id || '',
-			},
-			{
-				id: 'camera',
-				type: 'dropdown',
-				label: 'Camera',
-				choices: physicalCameraChoices,
-				default: physicalCameraChoices[0]?.id || '',
-			},
-		],
-		callback: async (action) => {
-			const userUuid = action.options.user as string
-			const cameraUuid = action.options.camera as string
-			if (!userUuid) {
-				self.log('warn', 'No user selected')
-				return
-			}
-			self.userPreviewCamera(userUuid, cameraUuid || null)
-		},
-	}
-
-	actions['clear_user_preview'] = {
-		name: 'User: Clear Camera Selection',
-		description: "Clear a user's camera preview selection",
-		options: [
-			{
-				id: 'user',
-				type: 'dropdown',
-				label: 'User',
-				choices: userChoices,
-				default: userChoices[0]?.id || '',
-			},
-		],
-		callback: async (action) => {
-			const userUuid = action.options.user as string
-			if (!userUuid) {
-				self.log('warn', 'No user selected')
-				return
-			}
-			self.userPreviewCamera(userUuid, null)
-		},
-	}
+	Object.assign(actions, controllerActions(self))
 
 	actions['set_user_step_size'] = {
 		name: 'User: Set Step Size',
