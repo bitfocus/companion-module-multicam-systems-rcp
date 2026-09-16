@@ -27,7 +27,7 @@ jobs:
       - name: Verify packaged API 2 entrypoint
         run: |
           mkdir -p "$RUNNER_TEMP/companion-module"
-          tar -xzf multicam-systems-rcp-*.tgz -C "$RUNNER_TEMP/companion-module"
+          tar -xzf multicam-systems-rcp-*.tgz --strip-components=1 -C "$RUNNER_TEMP/companion-module"
           MODULE_PACKAGE="$RUNNER_TEMP/companion-module" node --input-type=module <<'JS'
           import {readFileSync} from 'node:fs'
           import {pathToFileURL} from 'node:url'
