@@ -1,4 +1,5 @@
 import { controllerPresets } from './controllers.js'
+import { addDeckPresets } from './deck.js'
 import { addGraphicsPresets, addToSection, sectionsToStructure, type PresetSections } from './graphics.js'
 import type { CompanionPresetDefinitions } from '@companion-module/base'
 import type { ModuleInstance, ModuleTypes } from './main.js'
@@ -742,5 +743,6 @@ export function UpdatePresets(self: ModuleInstance): void {
 		addToSection(sections, category, group ?? 'General', id)
 	}
 	addGraphicsPresets(self, definitions, sections)
+	addDeckPresets(self, definitions, sections)
 	self.setPresetDefinitions(sectionsToStructure(sections), definitions)
 }

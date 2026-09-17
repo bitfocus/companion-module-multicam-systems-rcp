@@ -27,6 +27,8 @@ export interface Camera {
 	displayName: string
 	virtualCameraEnable: boolean
 	controllerSwitcherSlot?: { switcherId: string; slotId: string }
+	/** The video engine source that shows this camera, when the RCP links one. */
+	videoSourceId?: string | null
 	controls: Control[]
 	tally: unknown
 	presets: { kind: string; number: number; name: string | null }[]
@@ -83,6 +85,8 @@ export interface Presentation {
 	accent: 'group' | 'single' | 'mono'
 	accentColor: string
 	topBar: boolean
+	/** Multiplier for every text size on the tiles (0.7–1.6). */
+	textScale: number
 	hiddenCameras: string[]
 	hiddenModules: string[]
 }

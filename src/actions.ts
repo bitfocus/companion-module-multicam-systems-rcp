@@ -1,4 +1,5 @@
 import { controllerActions } from './controllers.js'
+import { deckActions } from './deck.js'
 import type { CompanionActionDefinitions } from '@companion-module/base'
 import type { ModuleInstance } from './main.js'
 
@@ -672,7 +673,7 @@ export function UpdateActions(self: ModuleInstance): void {
 	// User Actions
 	// ===================
 
-	Object.assign(actions, controllerActions(self))
+	Object.assign(actions, controllerActions(self), deckActions(self))
 
 	actions['set_user_step_size'] = {
 		name: 'User: Set Step Size',

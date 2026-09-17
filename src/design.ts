@@ -83,6 +83,7 @@ export const DEFAULT_PRESENTATION: Presentation = {
 	accent: 'group',
 	accentColor: '#38bdf8',
 	topBar: false,
+	textScale: 1,
 	hiddenCameras: [],
 	hiddenModules: [],
 }
@@ -131,7 +132,8 @@ function canvas() {
 function text(
 	partial: Omit<ButtonGraphicsTextElement, 'type'> & { height: number; fontsize: number },
 ): ButtonGraphicsTextElement {
-	const fontsize = Math.min(200, Math.max(3, Math.round((partial.fontsize / partial.height) * 100)))
+	const scale = Number.isFinite(presentation.textScale) ? Math.min(1.6, Math.max(0.7, presentation.textScale)) : 1
+	const fontsize = Math.min(200, Math.max(3, Math.round(((partial.fontsize * scale) / partial.height) * 100)))
 	return {
 		type: 'text',
 		color: INK.text,
@@ -613,7 +615,22 @@ export function tallyTile(
 }
 
 /** Live video with the source name; the image fills the tile once frames arrive. */
-export function liveTile(t: TileBase & { sourceName: string; localVariables: LocalVariables }): Layered {
+export function liveTile(
+	t: TileBase & {
+		sourceName: string
+		localVariables: LocalVariables
+		selected?: { feedbackId: string; options: Options }
+	},
+): Layered {
+	const selected: Feedbacks = t.selected
+		? [
+				override(t.selected.feedbackId, t.selected.options, [
+					{ elementId: 'frame', elementProperty: 'borderColor', override: t.accent },
+					{ elementId: 'frame', elementProperty: 'borderWidth', override: 4 },
+					{ elementId: 'label', elementProperty: 'color', override: t.accent },
+				]),
+			]
+		: []
 	return {
 		type: 'layered',
 		name: t.name,
@@ -634,7 +651,112 @@ export function liveTile(t: TileBase & { sourceName: string; localVariables: Loc
 			},
 			box('shade', 0, 80, 100, 20, INK.shade),
 			text({ id: 'label', text: t.sourceName, x: 4, y: 80, width: 92, height: 20, fontsize: 10, color: INK.text }),
+			{
+				type: 'box',
+				id: 'frame',
+				x: 0,
+				y: 0,
+				width: 100,
+				height: 100,
+				color: INK.clear,
+				cornerRadius: 6,
+				borderWidth: 0,
+				borderColor: t.accent,
+				borderPosition: 'inside',
+			},
 		],
+		feedbacks: [...selected, ...(t.feedbacks ?? [])],
+		steps: t.steps,
+	}
+}
+
+/**
+ * A deck slot: gauge for whatever control the user's bank puts here. Name, level, range and
+ * value text come from local variables (`name`, `level`, `min`, `max`, `text`) and the step
+ * size caption from `step`, so the same tile serves the LCD strip and the encoder below it.
+ */
+export function slotTile(t: TileBase & { localVariables: LocalVariables }): Layered {
+	const gauge = (orientation: 'ring' | 'horizontal', x: number, y: number, width: number, height: number) =>
+		({
+			type: 'gauge' as const,
+			id: orientation === 'ring' ? 'ring' : 'bar',
+			x,
+			y,
+			width,
+			height,
+			orientation,
+			startAngle: 225,
+			endAngle: 135,
+			ringWidth: 16,
+			roundedEnds: true,
+			min: expr('$(local:min) ?? 0'),
+			max: expr('$(local:max) ?? 1'),
+			origin: expr('$(local:min) ?? 0'),
+			value: expr('$(local:level) ?? ($(local:min) ?? 0)'),
+			enabled: expr('$(local:level) !== undefined && $(local:level) !== null'),
+			trackStyle: 'dimmed' as const,
+			multiColour: false,
+			stops: [{ value: 0, color: t.accent, gradient: false }],
+		}) as ButtonGraphicsGaugeElement
+	const elements: SomeButtonGraphicsElement[] =
+		presentation.theme === 'rings'
+			? [
+					box('bg', 0, 0, 100, 100, INK.bg),
+					text({
+						id: 'label',
+						text: '$(local:name)',
+						x: 6,
+						y: 3,
+						width: 88,
+						height: 18,
+						fontsize: 11,
+						color: INK.muted,
+					}),
+					gauge('ring', 18, 20, 64, 66),
+					text({
+						id: 'value',
+						text: '$(local:text)',
+						x: 20,
+						y: 36,
+						width: 60,
+						height: 36,
+						fontsize: 20,
+						weight: 'bold',
+					}),
+					text({ id: 'step', text: '$(local:step)', x: 10, y: 86, width: 80, height: 12, fontsize: 8, color: INK.dim }),
+				]
+			: [
+					box('bg', 0, 0, 100, 100, INK.bg),
+					box('accent', 0, 0, 5, 100, t.accent),
+					text({
+						id: 'label',
+						text: '$(local:name)',
+						x: 8,
+						y: 4,
+						width: 90,
+						height: 24,
+						fontsize: 11,
+						color: INK.muted,
+					}),
+					text({
+						id: 'value',
+						text: '$(local:text)',
+						x: 8,
+						y: 28,
+						width: 90,
+						height: 40,
+						fontsize: 24,
+						weight: 'bold',
+					}),
+					...(presentation.theme === 'bars' ? [gauge('horizontal', 12, 72, 82, 10)] : []),
+					text({ id: 'step', text: '$(local:step)', x: 8, y: 86, width: 90, height: 12, fontsize: 8, color: INK.dim }),
+				]
+	return {
+		type: 'layered',
+		name: t.name,
+		canvas: canvas(),
+		localVariables: t.localVariables,
+		elements,
 		feedbacks: t.feedbacks ?? [],
 		steps: t.steps,
 	}

@@ -1,4 +1,5 @@
 import { controllerFeedbacks } from './controllers.js'
+import { deckFeedbacks } from './deck.js'
 import { graphicsFeedbacks } from './graphics.js'
 import { combineRgb, type CompanionFeedbackDefinitions } from '@companion-module/base'
 import type { ModuleInstance } from './main.js'
@@ -1063,5 +1064,10 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 			definition.callback = async (event, context) => (self.connected ? advancedCallback(event, context) : {})
 		}
 	}
-	self.setFeedbackDefinitions({ ...feedbacks, ...graphicsFeedbacks(self), ...controllerFeedbacks(self) })
+	self.setFeedbackDefinitions({
+		...feedbacks,
+		...graphicsFeedbacks(self),
+		...controllerFeedbacks(self),
+		...deckFeedbacks(self),
+	})
 }

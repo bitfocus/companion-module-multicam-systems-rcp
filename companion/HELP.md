@@ -35,6 +35,18 @@ buttons**: ring, bar or plain gauges, colour per control group / one colour / mo
 Companion's top bar on or off, and which cameras and routers get presets. Changes reach
 the preset list within a second; placed buttons keep working.
 
+## Stream Deck +
+
+The **Stream Deck +: <user>** section is one page that follows the operator. Row 1 holds
+the user's camera choices (live image where the RCP links a video source; press to
+select). Row 2 picks a control bank: Gain, Gamma, Lift or Exposure. The four LCD
+segments show the bank's four controls of the selected camera as ring gauges with the
+active step size underneath, and the encoder under each segment turns that control by
+the user's step size. Pushing an encoder cycles the step size (fine, normal, coarse) and
+the gauges follow. Bank and step size live in this Companion connection per RCP user.
+
+Text size, gauge style and colours come from the RCP's Setup → Companion buttons page.
+
 ## Live video
 
 The **Live video · 16:9** section provides one preset per discovered video source. Each

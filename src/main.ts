@@ -22,6 +22,7 @@ import {
 	type ControllerState,
 	Presentation,
 } from './api.js'
+import type { BankId } from './deck.js'
 import type {
 	WebsocketCamerasOutput,
 	User,
@@ -63,6 +64,8 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 
 	// Per-user step size preference (stored locally in Companion)
 	userStepSizes: Map<string, 'big' | 'normal' | 'small'> = new Map()
+	/** Stream Deck + control bank per user (see deck.ts). */
+	userBanks: Map<string, BankId> = new Map()
 
 	// Per-user PTZ preset mode preference (stored locally in Companion)
 	userPtzModes: Map<string, 'normal' | 'tracing' | 'scene'> = new Map()
@@ -604,6 +607,51 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 	/**
 	 * Get user's step size preference (defaults to 'normal')
 	 */
+	getUserBank(userUuid: string): BankId {
+		return this.userBanks.get(userUuid) ?? 'gain'
+	}
+	setUserBank(userUuid: string, bank: BankId): void {
+		if (!userUuid) return
+		this.userBanks.set(userUuid, bank)
+		this.checkFeedbacks(
+			'deck_bank_active',
+			'deck_slot_value',
+			'deck_slot_min',
+			'deck_slot_max',
+			'deck_slot_name',
+			'deck_slot_text',
+		)
+	}
+	/** The switcher feeding a user's virtual camera, whose choices are the user's cameras. */
+	userSwitcher(userUuid: string): ControllerState['switchers'][number] | undefined {
+		const user = this.users.find((u) => u.uuid === userUuid)
+		const virtualCamera = user?.attachedVirtualCameraUuid
+			? this.apiCameras.find((c) => c.uuid === user.attachedVirtualCameraUuid)
+			: undefined
+		const slot = virtualCamera?.controllerSwitcherSlot
+		if (slot) return this.controllerSwitchers?.switchers.find((s) => s.id === slot.switcherId)
+		return this.controllerSwitchers?.switchers.find((s) => s.ownerUserId === userUuid)
+	}
+	/** The real camera a user is on right now: the switcher's effective choice, else the preview. */
+	userSelectedCameraUuid(userUuid: string): string | undefined {
+		const user = this.users.find((u) => u.uuid === userUuid)
+		const virtualCamera = user?.attachedVirtualCameraUuid
+			? this.apiCameras.find((c) => c.uuid === user.attachedVirtualCameraUuid)
+			: undefined
+		const slot = virtualCamera?.controllerSwitcherSlot
+		if (slot) {
+			const assignment = this.controllerSwitchers?.assignments.find(
+				(a) => a.switcherId === slot.switcherId && a.slotId === slot.slotId,
+			)
+			if (assignment?.target?.type === 'camera') return assignment.target.cameraId
+		}
+		const previewed = (user as { previewedCameraUuid?: string } | undefined)?.previewedCameraUuid
+		return previewed || user?.attachedVirtualCameraUuid || undefined
+	}
+	/** The video source that shows a camera, when the RCP links one. */
+	videoSourceForCamera(cameraUuid: string): string | undefined {
+		return this.apiCameras.find((c) => c.uuid === cameraUuid)?.videoSourceId || undefined
+	}
 	getUserStepSize(userUuid: string): 'big' | 'normal' | 'small' {
 		return this.userStepSizes.get(userUuid) || 'normal'
 	}
