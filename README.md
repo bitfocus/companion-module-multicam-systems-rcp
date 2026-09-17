@@ -22,6 +22,19 @@ yarn package
 module developer folder. `src/api.ts` is a standalone HTTP/WebSocket reference
 client and has no dependency on Multicam's internal transports.
 
+### Button design gallery
+
+`yarn design:gallery` renders every preset through a running Companion (the
+dev build, admin on port 8000, with this module connected to an RCP) into
+`tools/design-gallery/out/index.html`. Each preset is placed on a scratch page,
+drawn at 288 px with live variables and feedbacks, then removed again, so the
+page shows exactly what an operator gets on a Stream Deck. `--label` names a
+pass so several live states sit side by side, `--filter` limits the run to
+matching preset ids or names, `--mode preset` uses Companion's preset preview
+instead of a placed button. Serve the output directory with any static server
+to browse it. The tile builders live in `src/design.ts`; every preset in
+`src/presets.ts`, `src/graphics.ts` and `src/controllers.ts` is composed from them.
+
 Saved action/feedback IDs and explicit host/port settings are retained on upgrade.
 A newly issued API token is required. This beta is not a release for older Electron
 servers. Companion and Central Control partner acceptance should precede a stable API commitment.

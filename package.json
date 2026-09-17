@@ -12,7 +12,8 @@
 		"dev": "tsc -p tsconfig.build.json --watch",
 		"lint:raw": "eslint",
 		"lint": "yarn lint:raw .",
-		"test": "yarn build:main && node --test test-api.mjs"
+		"test": "yarn build:main && node --test test-api.mjs",
+		"design:gallery": "tsx tools/design-gallery.mts"
 	},
 	"license": "MIT",
 	"repository": {
@@ -28,6 +29,8 @@
 	},
 	"devDependencies": {
 		"@companion-module/tools": "^3.1.0",
+		"@trpc/client": "^11.18.0",
+		"@trpc/server": "^11.18.0",
 		"@types/node": "^22.18.13",
 		"@types/ws": "^8.18.1",
 		"eslint": "^10.0.0",
@@ -35,6 +38,7 @@
 		"lint-staged": "^16.2.6",
 		"prettier": "^3.8.1",
 		"rimraf": "^6.1.0",
+		"tsx": "^4.23.13",
 		"typescript": "~6.0.3",
 		"typescript-eslint": "^8.56.1"
 	},

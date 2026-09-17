@@ -1,11 +1,7 @@
-import {
-	combineRgb,
-	type CompanionActionDefinitions,
-	type CompanionFeedbackDefinitions,
-	type CompanionSimplePresetDefinition,
-} from '@companion-module/base'
+import { combineRgb, type CompanionActionDefinitions, type CompanionFeedbackDefinitions } from '@companion-module/base'
 import type { ModuleInstance } from './main.js'
 import type { ControllerState } from './api.js'
+import { ACCENT, pillTile, type Layered } from './design.js'
 
 type Host = Pick<ModuleInstance, 'connected' | 'controllerSwitchers' | 'command' | 'log'>
 
@@ -86,24 +82,21 @@ export function controllerFeedbacks(self: Host): CompanionFeedbackDefinitions {
 	}
 }
 
-export function controllerPresets(self: Host): Record<string, CompanionSimplePresetDefinition & { category: string }> {
-	const presets: Record<string, CompanionSimplePresetDefinition & { category: string }> = {}
+export function controllerPresets(self: Host): Record<string, Layered & { category: string }> {
+	const presets: Record<string, Layered & { category: string }> = {}
 	for (const switcher of self.controllerSwitchers?.switchers ?? []) {
 		for (const choice of switcher.choices) {
 			const key = JSON.stringify([switcher.id, choice.id])
 			presets[`controller_${Buffer.from(key).toString('base64url')}`] = {
-				type: 'simple',
+				...pillTile({
+					name: `Select ${choice.name}`,
+					label: choice.name,
+					caption: switcher.name,
+					accent: ACCENT.controller,
+					active: { feedbackId: 'controller_selected', options: { choice: key } },
+					steps: [{ down: [{ actionId: 'controller_select', options: { choice: key } }], up: [] }],
+				}),
 				category: `Controller choices: ${switcher.name}`,
-				name: `Select ${choice.name}`,
-				style: { text: choice.name, size: 'auto', color: combineRgb(255, 255, 255), bgcolor: combineRgb(40, 40, 40) },
-				steps: [{ down: [{ actionId: 'controller_select', options: { choice: key } }], up: [] }],
-				feedbacks: [
-					{
-						feedbackId: 'controller_selected',
-						options: { choice: key },
-						style: { bgcolor: combineRgb(0, 100, 180), color: combineRgb(255, 255, 255) },
-					},
-				],
 			}
 		}
 	}

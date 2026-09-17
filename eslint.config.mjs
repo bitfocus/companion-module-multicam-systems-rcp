@@ -5,4 +5,5 @@ export default [
 		enableTypescript: true,
 	})),
 	{ files: ['test-*.mjs'], rules: { 'n/no-unpublished-import': 'off' } },
+	{ ignores: ['tools/**'] },
 ]

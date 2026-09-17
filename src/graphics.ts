@@ -1,12 +1,12 @@
-import {
-	ButtonGraphicsDecorationType,
-	ButtonGraphicsShowStatusIcons,
-	type CompanionFeedbackDefinitions,
-	type CompanionPresetDefinitions,
-	type CompanionPresetSection,
+import type {
+	CompanionFeedbackDefinitions,
+	CompanionPresetDefinitions,
+	CompanionPresetSection,
 } from '@companion-module/base'
 import type { ModuleInstance, ModuleTypes } from './main.js'
+import { ACCENT, channelAccent, controlSource, liveTile, valueTile } from './design.js'
 
+/** Value feedbacks: read as local variables by the layered tiles. */
 export function graphicsFeedbacks(self: ModuleInstance): CompanionFeedbackDefinitions {
 	return {
 		control_value: {
@@ -38,6 +38,41 @@ export function graphicsFeedbacks(self: ModuleInstance): CompanionFeedbackDefini
 				return typeof value === 'number' && Number.isFinite(value) ? value : null
 			},
 		},
+		camera_tally_state: {
+			type: 'value',
+			name: 'Camera tally state',
+			description: 'The tally colour of a camera as text: red, green, yellow, blue, purple or off.',
+			options: [
+				{
+					type: 'dropdown',
+					id: 'camera',
+					label: 'Camera',
+					choices: self.cameraChoices,
+					default: self.cameraChoices[0]?.id ?? '',
+				},
+			],
+			callback: (feedback) => (self.connected ? self.getCameraTallyColor(feedback.options.camera as string) : 'off'),
+		},
+		route_tally_state: {
+			type: 'value',
+			name: 'Router output tally state',
+			description: 'The tally colour of a router output as text: red, green, yellow, blue, purple or off.',
+			options: [
+				{
+					type: 'dropdown',
+					id: 'module',
+					label: 'Module/Router',
+					choices: self.moduleChoices,
+					default: self.moduleChoices[0]?.id ?? '',
+				},
+				{ type: 'number', id: 'output', label: 'Output', default: 0, min: 0, max: 999 },
+			],
+			callback: (feedback) => {
+				if (!self.connected) return 'off'
+				const bus = self.tally.find((t) => t.uuid === feedback.options.module)
+				return bus?.outputs?.[Number(feedback.options.output)]?.tallyColor ?? 'off'
+			},
+		},
 		live_image: {
 			type: 'value',
 			name: 'Live video image',
@@ -67,6 +102,8 @@ export function graphicsFeedbacks(self: ModuleInstance): CompanionFeedbackDefini
 		},
 	}
 }
+
+/** Read-only gauges for every numeric control, and live video tiles. */
 export function addGraphicsPresets(
 	self: ModuleInstance,
 	definitions: CompanionPresetDefinitions<ModuleTypes>,
@@ -86,60 +123,19 @@ export function addGraphicsPresets(
 				continue
 			const id = `gauge_${camera.uuid}_${control.id}`
 			gauges.push(id)
-			definitions[id] = {
-				type: 'layered',
+			const group = (control as { group?: string }).group ?? 'system'
+			const accent = channelAccent(control.id, ACCENT[group] ?? ACCENT.system)
+			definitions[id] = valueTile({
 				name: `${camera.name} · ${control.name ?? control.id}`,
-				feedbacks: [],
-				localVariables: [
-					{
-						variableType: 'feedback',
-						variableName: 'level',
-						feedbackId: 'control_value',
-						options: { camera: camera.uuid, property: control.id },
-					},
-				],
-				elements: [
-					{
-						type: 'text',
-						text: `${camera.name}\n${control.name ?? control.id}`,
-						x: 0,
-						y: 0,
-						width: 100,
-						height: 45,
-						fontsize: 32,
-						fontsizeAllowShrink: true,
-						color: 0xffffff,
-					},
-					{
-						type: 'gauge',
-						x: 5,
-						y: 52,
-						width: 90,
-						height: 20,
-						min: control.min,
-						max: control.max,
-						origin: control.min,
-						value: { isExpression: true, value: '$(local:level) ?? 0' },
-						enabled: { isExpression: true, value: '$(local:level) !== null' },
-						orientation: 'horizontal',
-						trackStyle: 'dimmed',
-						stops: [{ value: control.min, color: 0x30bfff, gradient: false }],
-					},
-					{
-						type: 'text',
-						x: 0,
-						y: 76,
-						width: 100,
-						height: 24,
-						text: {
-							isExpression: true,
-							value: '$(local:level) === null ? "Offline" : "" + $(local:level)',
-						},
-						fontsize: 60,
-						fontsizeAllowShrink: true,
-						color: 0xffffff,
-					},
-				],
+				label: control.name ?? control.id,
+				accent,
+				source: controlSource(
+					camera.uuid,
+					control.id,
+					control.min,
+					control.max,
+					(control as { unit?: string | null }).unit,
+				),
 				steps: [
 					{
 						down: [],
@@ -162,17 +158,16 @@ export function addGraphicsPresets(
 							: [],
 					},
 				],
-			}
+			})
 		}
 	for (const source of self.videoSources) {
 		const id = `video_${source.id}`
 		video.push(id)
-		definitions[id] = {
-			type: 'layered',
+		definitions[id] = liveTile({
 			name: `Live · ${source.name ?? source.id}`,
-			feedbacks: [],
+			sourceName: source.name ?? source.id,
+			accent: ACCENT.monitor,
 			steps: [{ down: [], up: [] }],
-			canvas: { decoration: ButtonGraphicsDecorationType.None, showStatusIcons: ButtonGraphicsShowStatusIcons.None },
 			localVariables: [
 				{
 					variableType: 'feedback',
@@ -181,40 +176,7 @@ export function addGraphicsPresets(
 					options: { source: source.id, width: 160, height: 90, fps: 10, quality: 65 },
 				},
 			],
-			elements: [
-				{
-					type: 'text',
-					text: 'Waiting for video',
-					x: 0,
-					y: 21.875,
-					width: 100,
-					height: 56.25,
-					color: 0x999999,
-					fontsize: 32,
-					fontsizeAllowShrink: true,
-				},
-				{
-					type: 'image',
-					base64Image: { isExpression: true, value: '$(local:image)' },
-					x: 0,
-					y: 21.875,
-					width: 100,
-					height: 56.25,
-					fillMode: 'fit',
-				},
-				{
-					type: 'text',
-					text: source.name ?? source.id,
-					x: 0,
-					y: 80,
-					width: 100,
-					height: 20,
-					color: 0xffffff,
-					fontsize: 60,
-					fontsizeAllowShrink: true,
-				},
-			],
-		}
+		})
 	}
 	if (gauges.length) sections.push({ id: 'control-gauges', name: 'Control gauges', definitions: gauges })
 	if (video.length) sections.push({ id: 'live-video', name: 'Live video · 16:9', definitions: video })

@@ -176,8 +176,8 @@ export function UpdateVariableValues(self: ModuleInstance): void {
 		// Add routing input/output labels for this user (based on their selected module)
 		const userIdShort = user.uuid.substring(0, 8)
 		for (let i = 0; i < 40; i++) {
-			values[`user_${userIdShort}_route_in_${i}_name`] = self.getUserRouteInputLabel(user.uuid, i) || `In ${i}`
-			values[`user_${userIdShort}_route_out_${i}_name`] = self.getUserRouteOutputLabel(user.uuid, i) || `Out ${i}`
+			values[`user_${userIdShort}_route_in_${i}_name`] = self.getUserRouteInputLabel(user.uuid, i) || `In ${i + 1}`
+			values[`user_${userIdShort}_route_out_${i}_name`] = self.getUserRouteOutputLabel(user.uuid, i) || `Out ${i + 1}`
 		}
 	})
 
