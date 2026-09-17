@@ -311,13 +311,23 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 	}
 
 	applyApiState(state: ApiState): void {
+		// Only structure goes into the hash. A camera switch changes which camera a virtual
+		// camera resolves to, what a user previews and a source's status; none of that changes
+		// the presets, and a rebuild makes Companion re-ingest and re-render every preset.
 		const topology = JSON.stringify([
 			state.cameras?.map((c) => [
 				c.uuid,
 				c.name,
-				c.controls.map(({ value: _value, actual: _actual, desired: _desired, ...control }) => control),
+				c.videoSourceId ?? null,
+				c.controls.map(
+					({ value: _value, actual: _actual, desired: _desired, resolvedCameraId: _resolved, ...control }) => control,
+				),
 			]),
-			state.users,
+			(state.users as { uuid: string; name: string; attachedVirtualCameraUuid?: string }[] | undefined)?.map((u) => [
+				u.uuid,
+				u.name,
+				u.attachedVirtualCameraUuid ?? null,
+			]),
 			state.routing?.map((bus) => {
 				const b = bus as IModuleTallyBuses
 				return [
@@ -327,7 +337,7 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 					Object.entries(b.outputs ?? {}).map(([id, p]) => [id, p.name, p.customName]),
 				]
 			}),
-			state.videoSources,
+			state.videoSources?.map((v) => [v.id, v.name ?? null, v.type]),
 			state.presentation,
 			state.controllerSwitchers?.switchers.map(({ selectedChoiceId: _selection, ...definition }) => definition),
 		])
