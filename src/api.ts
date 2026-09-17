@@ -167,9 +167,13 @@ export class IntegrationApi {
 			if (!this.closed) this.onClose()
 		})
 	}
+	private authHeaders(token: string): Record<string, string> {
+		return token ? { Authorization: `Bearer ${token}` } : {}
+	}
 	webSocket(path: string): WebSocket {
+		const token = this.currentToken || (typeof this.token === 'string' ? this.token : '')
 		return new WebSocket(new URL(this.url.replace(/^http/, 'ws').replace(/\/$/, '') + path), {
-			headers: { Authorization: `Bearer ${this.currentToken || this.token}` },
+			headers: this.authHeaders(token),
 			maxPayload: 4 * 1024 * 1024,
 			handshakeTimeout: 5000,
 		})
@@ -183,7 +187,7 @@ export class IntegrationApi {
 			if (this.closed) throw Error('Connection closed')
 			const response = await fetch(new URL(this.url.replace(/\/$/, '') + '/api/v1/commands'), {
 				method: 'POST',
-				headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+				headers: { ...this.authHeaders(token), 'Content-Type': 'application/json' },
 				body: JSON.stringify({ requestId: randomUUID(), sentAtMs: Date.now(), ttlMs: 2000, operation }),
 				signal: abort.signal,
 			})

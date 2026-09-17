@@ -45,7 +45,8 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			id: 'token',
 			label: 'Integration API token',
 			width: 12,
-			tooltip: 'Create a project-scoped token with monitor, control, routing and images access.',
+			tooltip:
+				'Optional for a local RCP on this machine unless token enforcement is switched on there. Otherwise create a project-scoped token with monitor, control, routing and images access.',
 		},
 		{ type: 'checkbox', id: 'tls', label: 'Use HTTPS / WSS', width: 6, default: false },
 		{

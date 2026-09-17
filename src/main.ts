@@ -269,10 +269,11 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 				url = cloud.url
 				token = cloud.token
 			} else {
-				if (!this.config.host || !this.config.port || !this.secrets.token)
-					throw Error('Host, port and integration token are required')
+				// A local RCP accepts callers on its own machine without a token unless
+				// token enforcement was switched on there; the token is optional here.
+				if (!this.config.host || !this.config.port) throw Error('Host and port are required')
 				url = `${this.config.tls ? 'https' : 'http'}://${this.config.host}:${this.config.port}`
-				token = this.secrets.token
+				token = this.secrets.token ?? ''
 			}
 		} catch (error) {
 			this.updateStatus(
