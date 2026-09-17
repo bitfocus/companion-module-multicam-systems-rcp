@@ -13,6 +13,25 @@ export function addToSection(sections: PresetSections, section: string, group: s
 	if (!ids) groups.set(group, (ids = []))
 	ids.push(id)
 }
+/**
+ * Companion keeps a style override only when its value is wrapped as an expression-or-value
+ * (`{ isExpression: false, value }`) and drops a feedback whose overrides all fall away, so
+ * every plain override value is wrapped here before the presets are published.
+ */
+export function normalizeStyleOverrides(definitions: CompanionPresetDefinitions<ModuleTypes>): void {
+	for (const preset of Object.values(definitions)) {
+		if (!preset || preset.type !== 'layered') continue
+		for (const feedback of preset.feedbacks ?? []) {
+			const overrides = (feedback as { styleOverrides?: { override: unknown }[] }).styleOverrides
+			for (const entry of overrides ?? []) {
+				const value = entry.override
+				const wrapped = typeof value === 'object' && value !== null && 'isExpression' in value
+				if (!wrapped) entry.override = { isExpression: false, value }
+			}
+		}
+	}
+}
+
 export function sectionsToStructure(sections: PresetSections): CompanionPresetSection<ModuleTypes>[] {
 	return Array.from(sections, ([name, groups]) => ({
 		id: name,

@@ -15,7 +15,7 @@ import type {
 import type { ModuleInstance, ModuleTypes } from './main.js'
 import type { Control } from './api.js'
 import { addToSection, type PresetSections } from './graphics.js'
-import { liveTile, pillTile, slotTile, tone, type Layered } from './design.js'
+import { channelAccent, liveTile, pillTile, slotTile, tone, type Layered } from './design.js'
 
 export type BankId = 'gain' | 'gamma' | 'lift' | 'exposure'
 export const BANKS: { id: BankId; name: string; group: string; slots: string[][] }[] = [
@@ -220,6 +220,17 @@ export function deckFeedbacks(self: ModuleInstance): CompanionFeedbackDefinition
 				return `${value.toFixed(decimals)}${unit ? ' ' + unit : ''}`
 			},
 		},
+		deck_slot_accent: {
+			type: 'value',
+			name: 'Deck: Slot colour',
+			description: 'The colour of the control in a bank slot (red gain is red), as a Companion colour number.',
+			options: [userOptions(self), slotOption],
+			callback: (feedback) => {
+				const { control } = slotContext(self, feedback.options)
+				if (!control) return tone('system')
+				return channelAccent(control.id, (control as { group?: string }).group ?? 'system')
+			},
+		},
 		deck_step_label: {
 			type: 'value',
 			name: 'Deck: Step size label',
@@ -317,6 +328,7 @@ export function addDeckPresets(
 				{ variableType: 'feedback' as const, variableName: 'max', feedbackId: 'deck_slot_max', options },
 				{ variableType: 'feedback' as const, variableName: 'name', feedbackId: 'deck_slot_name', options },
 				{ variableType: 'feedback' as const, variableName: 'text', feedbackId: 'deck_slot_text', options },
+				{ variableType: 'feedback' as const, variableName: 'accent', feedbackId: 'deck_slot_accent', options },
 				{
 					variableType: 'feedback' as const,
 					variableName: 'step',

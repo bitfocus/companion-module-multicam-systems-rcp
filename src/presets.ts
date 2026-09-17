@@ -1,6 +1,12 @@
 import { controllerPresets } from './controllers.js'
 import { addDeckPresets } from './deck.js'
-import { addGraphicsPresets, addToSection, sectionsToStructure, type PresetSections } from './graphics.js'
+import {
+	addGraphicsPresets,
+	addToSection,
+	normalizeStyleOverrides,
+	sectionsToStructure,
+	type PresetSections,
+} from './graphics.js'
 import type { CompanionPresetDefinitions } from '@companion-module/base'
 import type { ModuleInstance, ModuleTypes } from './main.js'
 import {
@@ -676,5 +682,6 @@ export function UpdatePresets(self: ModuleInstance): void {
 	}
 	addGraphicsPresets(self, definitions, sections)
 	addDeckPresets(self, definitions, sections)
+	normalizeStyleOverrides(definitions)
 	self.setPresetDefinitions(sectionsToStructure(sections), definitions)
 }

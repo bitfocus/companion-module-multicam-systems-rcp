@@ -455,6 +455,8 @@ export function pillTile(
 	const active = t.activeColor ?? t.accent
 	const overrides: CompanionPresetFeedbackStyleOverride[] = [
 		{ elementId: 'fill', elementProperty: 'color', override: active },
+		{ elementId: 'fill', elementProperty: 'borderColor', override: INK.white },
+		{ elementId: 'fill', elementProperty: 'borderWidth', override: 4 },
 		{ elementId: 'label', elementProperty: 'color', override: INK.black },
 		{ elementId: 'caption', elementProperty: 'color', override: INK.black },
 	]
@@ -638,8 +640,9 @@ export function liveTile(
 		? [
 				override(t.selected.feedbackId, t.selected.options, [
 					{ elementId: 'frame', elementProperty: 'borderColor', override: t.accent },
-					{ elementId: 'frame', elementProperty: 'borderWidth', override: 4 },
-					{ elementId: 'label', elementProperty: 'color', override: t.accent },
+					{ elementId: 'frame', elementProperty: 'borderWidth', override: 7 },
+					{ elementId: 'shade', elementProperty: 'color', override: t.accent },
+					{ elementId: 'label', elementProperty: 'color', override: INK.black },
 				]),
 			]
 		: []
@@ -688,6 +691,8 @@ export function liveTile(
  * size caption from `step`, so the same tile serves the LCD strip and the encoder below it.
  */
 export function slotTile(t: TileBase & { localVariables: LocalVariables }): Layered {
+	// The colour of whatever control sits in the slot (a local variable from deck_slot_accent).
+	const accent = expr(`$(local:accent) ?? ${t.accent}`)
 	const gauge = (orientation: 'ring' | 'horizontal', x: number, y: number, width: number, height: number) =>
 		({
 			type: 'gauge' as const,
@@ -708,7 +713,7 @@ export function slotTile(t: TileBase & { localVariables: LocalVariables }): Laye
 			enabled: expr('$(local:level) !== undefined && $(local:level) !== null'),
 			trackStyle: 'dimmed' as const,
 			multiColour: false,
-			stops: [{ value: 0, color: t.accent, gradient: false }],
+			stops: [{ value: 0, color: accent, gradient: false }],
 		}) as ButtonGraphicsGaugeElement
 	const elements: SomeButtonGraphicsElement[] =
 		presentation.theme === 'rings'
@@ -739,7 +744,7 @@ export function slotTile(t: TileBase & { localVariables: LocalVariables }): Laye
 				]
 			: [
 					box('bg', 0, 0, 100, 100, INK.bg),
-					box('accent', 0, 0, 5, 100, t.accent),
+					{ type: 'box', id: 'accent', x: 0, y: 0, width: 5, height: 100, color: accent, cornerRadius: 0 },
 					text({
 						id: 'label',
 						text: '$(local:name)',
