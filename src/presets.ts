@@ -1,15 +1,15 @@
 import { controllerPresets } from './controllers.js'
-import { addGraphicsPresets } from './graphics.js'
+import { addGraphicsPresets, addToSection, sectionsToStructure, type PresetSections } from './graphics.js'
 import type { CompanionPresetDefinitions } from '@companion-module/base'
 import type { ModuleInstance, ModuleTypes } from './main.js'
 import {
-	ACCENT,
 	INK,
 	TALLY,
 	banner,
 	channelAccent,
+	applyPresentation,
+	tone,
 	controlSource,
-	displayTile,
 	labelTile,
 	numberTile,
 	pillTile,
@@ -21,7 +21,7 @@ import {
 	type Layered,
 } from './design.js'
 
-type Preset = Layered & { category: string }
+type Preset = Layered & { category: string; group?: string }
 
 const GROUP_ORDER: Record<string, { order: number; displayName: string }> = {
 	lens: { order: 1, displayName: 'Lens' },
@@ -100,6 +100,21 @@ function getCameraDisplayName(
 	return camera.name || `CAM ${fallbackIndex}`
 }
 
+/** Display names, with a number appended wherever two cameras share one, so sections stay apart. */
+function cameraDisplayNames(self: ModuleInstance): Map<string, string> {
+	const names = new Map<string, string>()
+	const counts = new Map<string, number>()
+	self.cameras.forEach((camera, index) => {
+		const name = getCameraDisplayName(camera, self.users, index + 1)
+		counts.set(name, (counts.get(name) ?? 0) + 1)
+	})
+	self.cameras.forEach((camera, index) => {
+		const name = getCameraDisplayName(camera, self.users, index + 1)
+		names.set(camera.uuid, (counts.get(name) ?? 0) > 1 ? `${name} ${index + 1}` : name)
+	})
+	return names
+}
+
 export function UpdatePresets(self: ModuleInstance): void {
 	const presets: Record<string, Preset> = {}
 	if (self.config.debug_messages) {
@@ -107,6 +122,12 @@ export function UpdatePresets(self: ModuleInstance): void {
 	}
 
 	/** What the API knows about a control; falls back to name heuristics. */
+	const presentation = applyPresentation(self.presentation)
+	const hiddenCameras = new Set(presentation.hiddenCameras)
+	const hiddenModules = new Set(presentation.hiddenModules)
+	const visibleCameras = self.cameras.filter((camera) => !hiddenCameras.has(camera.uuid))
+	const defaultUser = self.users[0]?.uuid ?? ''
+	const displayNames = cameraDisplayNames(self)
 	const describe = (cameraUuid: string, prop: string) => {
 		const control = self.control(cameraUuid, prop)
 		const apiType = control?.type
@@ -123,7 +144,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 		const min = typeof control?.min === 'number' ? control.min : 0
 		const max = typeof control?.max === 'number' && control.max > min ? control.max : min + 1
 		const unit = (control as { unit?: string | null } | undefined)?.unit ?? null
-		const accent = channelAccent(prop, ACCENT[group] ?? ACCENT.system)
+		const accent = channelAccent(prop, group)
 		const movement = control?.behavior === 'movement'
 		return { kind, group, label, min, max, unit, accent, movement }
 	}
@@ -131,9 +152,9 @@ export function UpdatePresets(self: ModuleInstance): void {
 	// ===================
 	// CAMERA SETTINGS FOLDERS: one folder per camera, controls grouped
 	// ===================
-	self.cameras.forEach((camera, cameraIndex) => {
+	visibleCameras.forEach((camera, cameraIndex) => {
 		const camNum = cameraIndex + 1
-		const cameraDisplayName = getCameraDisplayName(camera, self.users, camNum)
+		const cameraDisplayName = displayNames.get(camera.uuid) ?? getCameraDisplayName(camera, self.users, camNum)
 		const cameraUuid = camera.uuid
 		const camIdShort = cameraUuid.substring(0, 8)
 		const assignedUser = self.users.find((u) => u.attachedVirtualCameraUuid === camera.uuid)
@@ -156,10 +177,11 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 		for (const group of sortedGroups) {
 			const displayName = GROUP_ORDER[group]?.displayName ?? formatPropertyName(group)
-			const groupAccent = ACCENT[group] ?? ACCENT.system
+			const groupAccent = tone(group)
 			presets[`cam_${camIdShort}_group_${group}`] = {
 				...banner(`[${displayName}]`, displayName, groupAccent),
 				category: folderName,
+				group: displayName,
 			}
 
 			for (const prop of grouped[group].sort()) {
@@ -167,9 +189,11 @@ export function UpdatePresets(self: ModuleInstance): void {
 				const propIdShort = prop.substring(0, 16)
 				const variable = `$(multicam-rcp:camera_${camNum}_${prop})`
 				if (info.kind === 'float') {
+					// Companion 5 rejects an action whose options are missing or not among the dropdown choices,
+					// so every option is always set to a valid value.
 					const floatOptions = isUserCamera
 						? { camera: cameraUuid, property: prop, step_size: 'user_setting', user: userUuid }
-						: { camera: cameraUuid, property: prop, step_size: 'normal' }
+						: { camera: cameraUuid, property: prop, step_size: 'normal', user: defaultUser }
 					const source = controlSource(cameraUuid, prop, info.min, info.max, info.unit)
 					const up = [{ actionId: 'float_increase' as const, options: floatOptions }]
 					const down = [{ actionId: 'float_decrease' as const, options: floatOptions }]
@@ -183,6 +207,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 							steps: [{ down: up, up: [] }],
 						}),
 						category: folderName,
+						group: displayName,
 					}
 					presets[`cam_${camIdShort}_${propIdShort}_inc_val`] = {
 						...stepTile({
@@ -195,6 +220,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 							steps: [{ down: up, up: [] }],
 						}),
 						category: folderName,
+						group: displayName,
 					}
 					if (source) {
 						presets[`cam_${camIdShort}_${propIdShort}_val`] = {
@@ -206,6 +232,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 								steps: [{ down: [], up: [] }],
 							}),
 							category: folderName,
+							group: displayName,
 						}
 					} else {
 						presets[`cam_${camIdShort}_${propIdShort}_val`] = {
@@ -217,6 +244,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 								steps: [{ down: [], up: [] }],
 							}),
 							category: folderName,
+							group: displayName,
 						}
 					}
 					presets[`cam_${camIdShort}_${propIdShort}_dec`] = {
@@ -229,6 +257,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 							steps: [{ down, up: [] }],
 						}),
 						category: folderName,
+						group: displayName,
 					}
 				} else if (info.kind === 'boolean') {
 					const lit = { feedbackId: 'property_bool', options: { camera: cameraUuid, property: prop } }
@@ -248,6 +277,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 							],
 						}),
 						category: folderName,
+						group: displayName,
 					}
 					presets[`cam_${camIdShort}_${propIdShort}_off`] = {
 						...toggleTile({
@@ -265,6 +295,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 							],
 						}),
 						category: folderName,
+						group: displayName,
 					}
 					const toggle = toggleTile({
 						name: `${info.label} Toggle`,
@@ -281,7 +312,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 							styleOverrides: { elementId: string; elementProperty: string; override: unknown }[]
 						}
 					).styleOverrides.push({ elementId: 'state', elementProperty: 'text', override: 'ON' })
-					presets[`cam_${camIdShort}_${propIdShort}_toggle`] = { ...toggle, category: folderName }
+					presets[`cam_${camIdShort}_${propIdShort}_toggle`] = { ...toggle, category: folderName, group: displayName }
 				} else {
 					const next = [{ actionId: 'enum_next' as const, options: { camera: cameraUuid, property: prop } }]
 					const prev = [{ actionId: 'enum_prev' as const, options: { camera: cameraUuid, property: prop } }]
@@ -295,6 +326,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 							steps: [{ down: next, up: [] }],
 						}),
 						category: folderName,
+						group: displayName,
 					}
 					presets[`cam_${camIdShort}_${propIdShort}_next_val`] = {
 						...stepTile({
@@ -307,6 +339,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 							steps: [{ down: next, up: [] }],
 						}),
 						category: folderName,
+						group: displayName,
 					}
 					presets[`cam_${camIdShort}_${propIdShort}_val`] = {
 						...labelTile({
@@ -317,6 +350,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 							steps: [{ down: [], up: [] }],
 						}),
 						category: folderName,
+						group: displayName,
 					}
 					presets[`cam_${camIdShort}_${propIdShort}_prev`] = {
 						...stepTile({
@@ -327,38 +361,41 @@ export function UpdatePresets(self: ModuleInstance): void {
 							steps: [{ down: prev, up: [] }],
 						}),
 						category: folderName,
+						group: displayName,
 					}
 				}
 			}
 		}
 
 		presets[`cam_${camIdShort}_ptz_header`] = {
-			...banner('[PTZ Presets]', 'PTZ presets', ACCENT.ptz),
+			...banner('[PTZ Presets]', 'PTZ presets', tone('ptz')),
 			category: folderName,
+			group: 'PTZ presets',
 		}
 		for (let presetNum = 1; presetNum <= 20; presetNum++) {
 			const ptzOptions = isUserCamera
 				? { camera: cameraUuid, preset: presetNum, action: 'user_setting', mode: 'user_setting', user: userUuid }
-				: { camera: cameraUuid, preset: presetNum, action: 'recall', mode: 'normal' }
+				: { camera: cameraUuid, preset: presetNum, action: 'recall', mode: 'normal', user: defaultUser }
 			presets[`cam_${camIdShort}_ptz_${presetNum}`] = {
 				...numberTile({
 					name: `PTZ Preset ${presetNum}`,
 					number: presetNum,
 					caption: isUserCamera ? 'PTZ · user mode' : 'PTZ preset',
-					accent: ACCENT.ptz,
+					accent: tone('ptz'),
 					steps: [{ down: [{ actionId: 'ptz_preset', options: ptzOptions }], up: [] }],
 				}),
 				category: folderName,
+				group: 'PTZ presets',
 			}
 		}
 	})
 
 	// ===================
-	// ROTARY FOLDERS: an encoder tile and the display above it, per numeric control
+	// ROTARY FOLDERS: one ring tile per numeric control, for the Stream Deck + encoders
 	// ===================
-	self.cameras.forEach((camera, cameraIndex) => {
+	visibleCameras.forEach((camera, cameraIndex) => {
 		const camNum = cameraIndex + 1
-		const cameraDisplayName = getCameraDisplayName(camera, self.users, camNum)
+		const cameraDisplayName = displayNames.get(camera.uuid) ?? getCameraDisplayName(camera, self.users, camNum)
 		const cameraUuid = camera.uuid
 		const camIdShort = cameraUuid.substring(0, 8)
 		const assignedUser = self.users.find((u) => u.attachedVirtualCameraUuid === camera.uuid)
@@ -377,11 +414,11 @@ export function UpdatePresets(self: ModuleInstance): void {
 			const propIdShort = prop.substring(0, 16)
 			const floatOptions = isUserCamera
 				? { camera: cameraUuid, property: prop, step_size: 'user_setting', user: userUuid }
-				: { camera: cameraUuid, property: prop, step_size: 'normal' }
+				: { camera: cameraUuid, property: prop, step_size: 'normal', user: defaultUser }
 			const source = controlSource(cameraUuid, prop, info.min, info.max, info.unit)
 			presets[`rotary_${camIdShort}_${propIdShort}`] = {
 				...rotaryTile({
-					name: `${info.label} · Rotary`,
+					name: `${info.label} · Encoder`,
 					label: info.label,
 					accent: info.accent,
 					source,
@@ -395,16 +432,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					],
 				}),
 				category: rotaryFolderName,
-			}
-			presets[`display_${camIdShort}_${propIdShort}`] = {
-				...displayTile({
-					name: `${info.label} · Display`,
-					label: info.label,
-					accent: info.accent,
-					source,
-					steps: [{ down: [], up: [] }],
-				}),
-				category: rotaryFolderName,
+				group: GROUP_ORDER[info.group]?.displayName ?? formatPropertyName(info.group),
 			}
 		}
 	})
@@ -422,8 +450,9 @@ export function UpdatePresets(self: ModuleInstance): void {
 		const folderName = `User controls: ${userName}`
 
 		presets[`user_${userIdShort}_stepsize_header`] = {
-			...banner('[Adjust Step Size]', 'Step size', ACCENT.user),
+			...banner('[Adjust Step Size]', 'Step size', tone('user')),
 			category: folderName,
+			group: 'Step size',
 		}
 		for (const size of [
 			{ id: 'big', label: 'Big', activeColor: 0xf87171 },
@@ -435,7 +464,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					name: `Step Size: ${size.label.toUpperCase()}`,
 					label: size.label,
 					caption: 'Step size',
-					accent: ACCENT.user,
+					accent: tone('user'),
 					activeColor: size.activeColor,
 					active: { feedbackId: 'user_step_size', options: { user: userUuid, step_size: size.id } },
 					steps: [
@@ -443,12 +472,14 @@ export function UpdatePresets(self: ModuleInstance): void {
 					],
 				}),
 				category: folderName,
+				group: 'Step size',
 			}
 		}
 
 		presets[`user_${userIdShort}_ptzmode_header`] = {
-			...banner('[PTZ Mode]', 'PTZ mode', ACCENT.ptz),
+			...banner('[PTZ Mode]', 'PTZ mode', tone('ptz')),
 			category: folderName,
+			group: 'PTZ mode',
 		}
 		for (const mode of [
 			{ id: 'normal', label: 'Normal', activeColor: 0x34d399 },
@@ -460,7 +491,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					name: `PTZ Mode: ${mode.label.toUpperCase()}`,
 					label: mode.label,
 					caption: 'PTZ mode',
-					accent: ACCENT.ptz,
+					accent: tone('ptz'),
 					activeColor: mode.activeColor,
 					active: { feedbackId: 'user_ptz_mode', options: { user: userUuid, ptz_mode: mode.id } },
 					steps: [
@@ -468,12 +499,14 @@ export function UpdatePresets(self: ModuleInstance): void {
 					],
 				}),
 				category: folderName,
+				group: 'PTZ mode',
 			}
 		}
 
 		presets[`user_${userIdShort}_ptzaction_header`] = {
-			...banner('[PTZ Action]', 'PTZ action', ACCENT.ptz),
+			...banner('[PTZ Action]', 'PTZ action', tone('ptz')),
 			category: folderName,
+			group: 'PTZ action',
 		}
 		for (const action of [
 			{ id: 'recall', label: 'Recall', activeColor: 0x34d399 },
@@ -484,7 +517,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					name: `PTZ Action: ${action.label.toUpperCase()}`,
 					label: action.label,
 					caption: 'PTZ action',
-					accent: ACCENT.ptz,
+					accent: tone('ptz'),
 					activeColor: action.activeColor,
 					active: { feedbackId: 'user_ptz_action', options: { user: userUuid, ptz_action: action.id } },
 					steps: [
@@ -492,6 +525,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					],
 				}),
 				category: folderName,
+				group: 'PTZ action',
 			}
 		}
 
@@ -500,10 +534,11 @@ export function UpdatePresets(self: ModuleInstance): void {
 				name: `${userName} Info`,
 				title: `$(multicam-rcp:user_${userNum}_name)`,
 				subtitle: `$(multicam-rcp:user_${userNum}_preview_camera)`,
-				accent: ACCENT.user,
+				accent: tone('user'),
 				steps: [{ down: [], up: [] }],
 			}),
 			category: folderName,
+			group: 'Info',
 		}
 	})
 
@@ -520,7 +555,10 @@ export function UpdatePresets(self: ModuleInstance): void {
 		return input.customName || input.name || `Input ${inputIdx + 1}`
 	}
 	const routableBuses = self.tally.filter(
-		(bus) => Object.keys(bus.inputs || {}).length > 0 && Object.keys(bus.outputs || {}).length > 0,
+		(bus) =>
+			!hiddenModules.has(bus.uuid) &&
+			Object.keys(bus.inputs || {}).length > 0 &&
+			Object.keys(bus.outputs || {}).length > 0,
 	)
 	const busName = (tallyBus: (typeof self.tally)[number]) =>
 		tallyBus.name ||
@@ -542,7 +580,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					name: `Output: ${outputName}`,
 					title: outputName,
 					caption: moduleName,
-					accent: ACCENT.route,
+					accent: tone('route'),
 					tallyLocal: 'tally',
 					localVariables: [
 						{
@@ -566,6 +604,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					],
 				}),
 				category: folderName,
+				group: 'Outputs',
 			}
 		}
 		for (const key of Object.keys(tallyBus.inputs || {})) {
@@ -577,7 +616,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					name: `Input: ${sourceLabel(tallyBus, inputIdx)}`,
 					title: sourceLabel(tallyBus, inputIdx),
 					subtitle: `Input ${inputIdx + 1}`,
-					accent: ACCENT.route,
+					accent: tone('route'),
 					feedbackOverrides: [
 						{
 							feedbackId: 'route_source_active_static',
@@ -596,6 +635,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					],
 				}),
 				category: folderName,
+				group: 'Inputs',
 			}
 		}
 	}
@@ -614,7 +654,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					name: `Select ${moduleName}`,
 					title: moduleName,
 					subtitle: 'Router',
-					accent: ACCENT.route,
+					accent: tone('route'),
 					feedbackOverrides: [
 						{
 							feedbackId: 'route_module_selected',
@@ -630,6 +670,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					],
 				}),
 				category: folderName,
+				group: 'Router',
 			}
 		}
 		for (let outputIdx = 0; outputIdx < MAX_ROUTER_BUTTONS; outputIdx++) {
@@ -638,7 +679,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					name: `Output ${outputIdx + 1}`,
 					title: `$(multicam-rcp:user_${userIdShort}_route_out_${outputIdx}_name)`,
 					subtitle: `Output ${outputIdx + 1}`,
-					accent: ACCENT.route,
+					accent: tone('route'),
 					feedbackOverrides: [
 						{
 							feedbackId: 'route_destination_selected_user',
@@ -654,6 +695,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					],
 				}),
 				category: folderName,
+				group: 'Outputs',
 			}
 		}
 		for (let inputIdx = 0; inputIdx < MAX_ROUTER_BUTTONS; inputIdx++) {
@@ -662,7 +704,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					name: `Input ${inputIdx + 1}`,
 					title: `$(multicam-rcp:user_${userIdShort}_route_in_${inputIdx}_name)`,
 					subtitle: `Input ${inputIdx + 1}`,
-					accent: ACCENT.route,
+					accent: tone('route'),
 					feedbackOverrides: [
 						{
 							feedbackId: 'route_source_active_for_user',
@@ -681,6 +723,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					],
 				}),
 				category: folderName,
+				group: 'Inputs',
 			}
 		}
 	}
@@ -692,14 +735,12 @@ export function UpdatePresets(self: ModuleInstance): void {
 	)
 	self.log('info', `Setting ${Object.keys(presets).length} presets in categories: ${Array.from(categories).join(', ')}`)
 	const definitions: CompanionPresetDefinitions<ModuleTypes> = {}
-	const groups = new Map<string, string[]>()
-	for (const [id, { category, ...preset }] of Object.entries(presets)) {
+	// Companion 5 shows two levels: sections, each holding groups of presets.
+	const sections: PresetSections = new Map()
+	for (const [id, { category, group, ...preset }] of Object.entries(presets)) {
 		definitions[id] = preset
-		const ids = groups.get(category) || []
-		ids.push(id)
-		groups.set(category, ids)
+		addToSection(sections, category, group ?? 'General', id)
 	}
-	const sections = Array.from(groups, ([name, ids]) => ({ id: name, name, definitions: ids }))
 	addGraphicsPresets(self, definitions, sections)
-	self.setPresetDefinitions(sections, definitions)
+	self.setPresetDefinitions(sectionsToStructure(sections), definitions)
 }

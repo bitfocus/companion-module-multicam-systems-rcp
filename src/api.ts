@@ -74,6 +74,17 @@ export interface State {
 	users?: unknown[]
 	routing?: unknown[]
 	videoSources?: VideoSource[]
+	/** Setup → Companion buttons on the RCP: preset style and what to offer. */
+	presentation?: Partial<Presentation>
+}
+export interface Presentation {
+	version: 1
+	theme: 'rings' | 'bars' | 'plain'
+	accent: 'group' | 'single' | 'mono'
+	accentColor: string
+	topBar: boolean
+	hiddenCameras: string[]
+	hiddenModules: string[]
 }
 export interface ImageProfile {
 	sourceId: string

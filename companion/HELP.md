@@ -24,9 +24,16 @@ from command admission; accepting a command does not prove that hardware complet
 
 Preset actions use human-facing numbers 1–1000, mapped to API slots 0–999.
 
-Existing action and feedback IDs are retained. The new **Control gauges** preset section
-uses the server's numeric range and cached/project value. Rotate a Stream Deck + dial
-left/right to adjust a writable control. A disconnected gauge shows Offline.
+Existing action and feedback IDs are retained. Presets are Companion 5 layered buttons,
+arranged in sections per camera, user and router with a group per control family.
+Numeric controls show a ring gauge with the live value; **Rotary** presets go on a
+Stream Deck + LCD strip and turn the encoder below it. **Control gauges** are read-only
+levels for any numeric control. A disconnected value shows a dash.
+
+The look and the offered devices are chosen on the RCP under **Setup → Companion
+buttons**: ring, bar or plain gauges, colour per control group / one colour / monochrome,
+Companion's top bar on or off, and which cameras and routers get presets. Changes reach
+the preset list within a second; placed buttons keep working.
 
 ## Live video
 

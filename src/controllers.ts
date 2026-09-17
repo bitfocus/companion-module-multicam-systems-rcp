@@ -1,7 +1,7 @@
 import { combineRgb, type CompanionActionDefinitions, type CompanionFeedbackDefinitions } from '@companion-module/base'
 import type { ModuleInstance } from './main.js'
 import type { ControllerState } from './api.js'
-import { ACCENT, pillTile, type Layered } from './design.js'
+import { pillTile, tone, type Layered } from './design.js'
 
 type Host = Pick<ModuleInstance, 'connected' | 'controllerSwitchers' | 'command' | 'log'>
 
@@ -92,7 +92,7 @@ export function controllerPresets(self: Host): Record<string, Layered & { catego
 					name: `Select ${choice.name}`,
 					label: choice.name,
 					caption: switcher.name,
-					accent: ACCENT.controller,
+					accent: tone('controller'),
 					active: { feedbackId: 'controller_selected', options: { choice: key } },
 					steps: [{ down: [{ actionId: 'controller_select', options: { choice: key } }], up: [] }],
 				}),

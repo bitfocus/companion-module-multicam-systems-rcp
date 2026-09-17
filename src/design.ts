@@ -19,6 +19,7 @@ import {
 	ButtonGraphicsShowStatusIcons,
 } from '@companion-module/base'
 import type { ModuleTypes } from './main.js'
+import type { Presentation } from './api.js'
 
 export type Layered = CompanionLayeredButtonPresetDefinition<ModuleTypes>
 type Feedbacks = Layered['feedbacks']
@@ -76,19 +77,50 @@ export const ACCENT: Record<string, number> = {
 	route: 0xf59e0b,
 	controller: 0x2dd4bf,
 }
+export const DEFAULT_PRESENTATION: Presentation = {
+	version: 1,
+	theme: 'rings',
+	accent: 'group',
+	accentColor: '#38bdf8',
+	topBar: false,
+	hiddenCameras: [],
+	hiddenModules: [],
+}
+let presentation: Presentation = DEFAULT_PRESENTATION
+/** Apply the RCP's Companion presentation settings before building presets. */
+export function applyPresentation(next?: Partial<Presentation> | null): Presentation {
+	presentation = { ...DEFAULT_PRESENTATION, ...(next ?? {}) }
+	return presentation
+}
+export function currentPresentation(): Presentation {
+	return presentation
+}
+function parseHex(color: string, fallback: number): number {
+	const match = /^#?([0-9a-f]{6})$/i.exec(color.trim())
+	return match ? parseInt(match[1], 16) : fallback
+}
+/** The accent for a control group under the current accent mode. */
+export function tone(group: string): number {
+	if (presentation.accent === 'single') return parseHex(presentation.accentColor, ACCENT.lens)
+	if (presentation.accent === 'mono') return 0x9aa4b2
+	return ACCENT[group] ?? ACCENT.system
+}
 /** Colour-grading channels keep their own hue whatever group they sit in. */
-export function channelAccent(property: string, fallback: number): number {
+export function channelAccent(property: string, group: string): number {
+	if (presentation.accent !== 'group') return tone(group)
 	const p = property.toLowerCase()
 	if (/(^|_)(red|r)_(gain|lift|gamma|pedestal|phase|saturation)/.test(p)) return 0xef4444
 	if (/(^|_)(green|g)_(gain|lift|gamma|pedestal|phase|saturation)/.test(p)) return 0x22c55e
 	if (/(^|_)(blue|b)_(gain|lift|gamma|pedestal|phase|saturation)/.test(p)) return 0x3b82f6
-	return fallback
+	return tone(group)
 }
 
-/** Designed tiles own the whole face: no Companion top bar, status icons as configured. */
-const noStatus = {
-	decoration: ButtonGraphicsDecorationType.None,
-	showStatusIcons: ButtonGraphicsShowStatusIcons.FollowDefault,
+/** Designed tiles own the whole face unless the RCP asks for Companion's top bar. */
+function canvas() {
+	return {
+		decoration: presentation.topBar ? ButtonGraphicsDecorationType.TopBar : ButtonGraphicsDecorationType.None,
+		showStatusIcons: ButtonGraphicsShowStatusIcons.FollowDefault,
+	}
 }
 
 /**
@@ -144,8 +176,9 @@ function ring(
 		width,
 		height,
 		orientation: 'ring',
-		startAngle: 135,
-		endAngle: 45,
+		// Open at the bottom: sweep clockwise from 7 o'clock round to 5 o'clock.
+		startAngle: 225,
+		endAngle: 135,
 		ringWidth: 16,
 		roundedEnds: true,
 		min,
@@ -234,7 +267,7 @@ export function banner(name: string, title: string, accent: number): Layered {
 	return {
 		type: 'layered',
 		name,
-		canvas: noStatus,
+		canvas: canvas(),
 		elements: [
 			box('bg', 0, 0, 100, 100, accent, 8),
 			text({
@@ -254,88 +287,53 @@ export function banner(name: string, title: string, accent: number): Layered {
 	}
 }
 
-/** Ring gauge with the value inside and the control name underneath. */
+/**
+ * A numeric control's level: ring with the value inside (rings), big value over a bar (bars)
+ * or the value alone (plain). `stripe` adds the accent stripe used on button tiles; encoder
+ * tiles leave it off so the LCD strip reads as one surface.
+ */
+function levelTile(t: TileBase & { label: string; source: ValueSource }, stripe: boolean): Layered {
+	const { source } = t
+	const value = valueText(source.local, source.min, source.max, source.unit)
+	const base: SomeButtonGraphicsElement[] = stripe ? surface(t.accent) : [box('bg', 0, 0, 100, 100, INK.bg)]
+	const elements: SomeButtonGraphicsElement[] =
+		presentation.theme === 'rings'
+			? [
+					...base,
+					text({ id: 'label', text: t.label, x: 6, y: 3, width: 88, height: 18, fontsize: 11, color: INK.muted }),
+					ring('ring', source.local, source.min, source.max, t.accent, 18, 20, 64, 78),
+					text({ id: 'value', text: value, x: 20, y: 38, width: 60, height: 40, fontsize: 22, weight: 'bold' }),
+				]
+			: [
+					...base,
+					text({ id: 'label', text: t.label, x: 8, y: 4, width: 90, height: 26, fontsize: 11, color: INK.muted }),
+					text({ id: 'value', text: value, x: 8, y: 30, width: 90, height: 40, fontsize: 24, weight: 'bold' }),
+					...(presentation.theme === 'bars'
+						? [bar('bar', source.local, source.min, source.max, t.accent, 82, 10)]
+						: []),
+				]
+	return {
+		type: 'layered',
+		name: t.name,
+		canvas: canvas(),
+		localVariables: source.localVariables,
+		elements,
+		feedbacks: t.feedbacks ?? [],
+		steps: t.steps,
+	}
+}
+
+/** A read-only or press-to-adjust level on a button. */
 export function valueTile(t: TileBase & { label: string; source: ValueSource }): Layered {
-	const { source } = t
-	return {
-		type: 'layered',
-		name: t.name,
-		canvas: noStatus,
-		localVariables: source.localVariables,
-		elements: [
-			...surface(t.accent),
-			ring('ring', source.local, source.min, source.max, t.accent, 22, 2, 66, 72),
-			text({
-				id: 'value',
-				text: valueText(source.local, source.min, source.max, source.unit),
-				x: 24,
-				y: 18,
-				width: 62,
-				height: 40,
-				fontsize: 20,
-				weight: 'bold',
-			}),
-			text({ id: 'label', text: t.label, x: 8, y: 76, width: 90, height: 24, fontsize: 11, color: INK.muted }),
-		],
-		feedbacks: t.feedbacks ?? [],
-		steps: t.steps,
-	}
+	return levelTile(t, true)
 }
 
-/** The display above a Stream Deck + encoder: same ring, larger value, name above. */
-export function displayTile(t: TileBase & { label: string; source: ValueSource }): Layered {
-	const { source } = t
-	return {
-		type: 'layered',
-		name: t.name,
-		canvas: { decoration: ButtonGraphicsDecorationType.None, showStatusIcons: ButtonGraphicsShowStatusIcons.None },
-		localVariables: source.localVariables,
-		elements: [
-			box('bg', 0, 0, 100, 100, INK.bg),
-			text({ id: 'label', text: t.label, x: 6, y: 2, width: 88, height: 20, fontsize: 11, color: INK.muted }),
-			ring('ring', source.local, source.min, source.max, t.accent, 20, 20, 60, 80),
-			text({
-				id: 'value',
-				text: valueText(source.local, source.min, source.max, source.unit),
-				x: 22,
-				y: 34,
-				width: 56,
-				height: 40,
-				fontsize: 24,
-				weight: 'bold',
-			}),
-		],
-		feedbacks: t.feedbacks ?? [],
-		steps: t.steps,
-	}
-}
-
-/** The encoder itself: name, live value and a turn hint. Press actions come from `steps`. */
+/**
+ * A numeric control on a Stream Deck + encoder: Companion draws this tile on the LCD strip
+ * above the knob and runs its rotate actions when the knob turns.
+ */
 export function rotaryTile(t: TileBase & { label: string; source: ValueSource }): Layered {
-	const { source } = t
-	return {
-		type: 'layered',
-		name: t.name,
-		canvas: noStatus,
-		localVariables: source.localVariables,
-		elements: [
-			...surface(t.accent),
-			text({ id: 'label', text: t.label, x: 8, y: 4, width: 90, height: 26, fontsize: 11, color: INK.muted }),
-			text({
-				id: 'value',
-				text: valueText(source.local, source.min, source.max, source.unit),
-				x: 8,
-				y: 30,
-				width: 90,
-				height: 40,
-				fontsize: 24,
-				weight: 'bold',
-			}),
-			bar('bar', source.local, source.min, source.max, t.accent, 82, 10),
-		],
-		feedbacks: t.feedbacks ?? [],
-		steps: t.steps,
-	}
+	return levelTile(t, false)
 }
 
 /** Increase or decrease: the name, a big glyph and a thin position bar. */
@@ -378,11 +376,12 @@ export function stepTile(
 			}),
 		)
 	}
-	if (t.source) elements.push(bar('bar', t.source.local, t.source.min, t.source.max, t.accent, 86, 8))
+	if (t.source && presentation.theme !== 'plain')
+		elements.push(bar('bar', t.source.local, t.source.min, t.source.max, t.accent, 86, 8))
 	return {
 		type: 'layered',
 		name: t.name,
-		canvas: noStatus,
+		canvas: canvas(),
 		localVariables: t.source?.localVariables,
 		elements,
 		feedbacks: t.feedbacks ?? [],
@@ -408,7 +407,7 @@ export function toggleTile(
 	return {
 		type: 'layered',
 		name: t.name,
-		canvas: noStatus,
+		canvas: canvas(),
 		elements: [
 			...surface(t.accent),
 			text({ id: 'label', text: t.label, x: 8, y: 4, width: 90, height: 24, fontsize: 11, color: INK.muted }),
@@ -448,7 +447,7 @@ export function pillTile(
 	return {
 		type: 'layered',
 		name: t.name,
-		canvas: noStatus,
+		canvas: canvas(),
 		elements: [
 			box('bg', 0, 0, 100, 100, INK.bg),
 			{
@@ -495,7 +494,7 @@ export function numberTile(t: TileBase & { number: number; caption: string }): L
 	return {
 		type: 'layered',
 		name: t.name,
-		canvas: noStatus,
+		canvas: canvas(),
 		elements: [
 			...surface(t.accent),
 			text({ id: 'caption', text: t.caption, x: 8, y: 4, width: 90, height: 22, fontsize: 11, color: INK.muted }),
@@ -518,7 +517,7 @@ export function labelTile(
 	return {
 		type: 'layered',
 		name: t.name,
-		canvas: noStatus,
+		canvas: canvas(),
 		localVariables: t.localVariables,
 		elements: [
 			...surface(t.accent),
@@ -578,7 +577,7 @@ export function tallyTile(
 	return {
 		type: 'layered',
 		name: t.name,
-		canvas: noStatus,
+		canvas: canvas(),
 		localVariables: t.localVariables,
 		elements: [
 			{ type: 'box', id: 'bg', x: 0, y: 0, width: 100, height: 100, color: bg },
@@ -618,7 +617,7 @@ export function liveTile(t: TileBase & { sourceName: string; localVariables: Loc
 	return {
 		type: 'layered',
 		name: t.name,
-		canvas: { decoration: ButtonGraphicsDecorationType.None, showStatusIcons: ButtonGraphicsShowStatusIcons.None },
+		canvas: canvas(),
 		localVariables: t.localVariables,
 		elements: [
 			box('bg', 0, 0, 100, 100, INK.black),

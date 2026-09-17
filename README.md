@@ -34,6 +34,9 @@ matching preset ids or names, `--mode preset` uses Companion's preset preview
 instead of a placed button. Serve the output directory with any static server
 to browse it. The tile builders live in `src/design.ts`; every preset in
 `src/presets.ts`, `src/graphics.ts` and `src/controllers.ts` is composed from them.
+The RCP's Setup → Companion buttons page (`state.presentation` in the API) selects the
+gauge theme, accent mode, top bar and which cameras/routers get presets; the tiles read
+it through `applyPresentation()`.
 
 Saved action/feedback IDs and explicit host/port settings are retained on upgrade.
 A newly issued API token is required. This beta is not a release for older Electron

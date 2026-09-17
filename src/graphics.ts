@@ -3,8 +3,30 @@ import type {
 	CompanionPresetDefinitions,
 	CompanionPresetSection,
 } from '@companion-module/base'
+
+/** Section name → group name → preset ids, in insertion order. */
+export type PresetSections = Map<string, Map<string, string[]>>
+export function addToSection(sections: PresetSections, section: string, group: string, id: string): void {
+	let groups = sections.get(section)
+	if (!groups) sections.set(section, (groups = new Map()))
+	let ids = groups.get(group)
+	if (!ids) groups.set(group, (ids = []))
+	ids.push(id)
+}
+export function sectionsToStructure(sections: PresetSections): CompanionPresetSection<ModuleTypes>[] {
+	return Array.from(sections, ([name, groups]) => ({
+		id: name,
+		name,
+		definitions: Array.from(groups, ([groupName, presets]) => ({
+			type: 'simple' as const,
+			id: `${name} / ${groupName}`,
+			name: groupName,
+			presets,
+		})),
+	}))
+}
 import type { ModuleInstance, ModuleTypes } from './main.js'
-import { ACCENT, channelAccent, controlSource, liveTile, valueTile } from './design.js'
+import { channelAccent, controlSource, currentPresentation, liveTile, tone, valueTile } from './design.js'
 
 /** Value feedbacks: read as local variables by the layered tiles. */
 export function graphicsFeedbacks(self: ModuleInstance): CompanionFeedbackDefinitions {
@@ -107,11 +129,11 @@ export function graphicsFeedbacks(self: ModuleInstance): CompanionFeedbackDefini
 export function addGraphicsPresets(
 	self: ModuleInstance,
 	definitions: CompanionPresetDefinitions<ModuleTypes>,
-	sections: CompanionPresetSection<ModuleTypes>[],
+	sections: PresetSections,
 ): void {
-	const gauges: string[] = []
-	const video: string[] = []
-	for (const camera of self.apiCameras)
+	const defaultUser = self.users[0]?.uuid ?? ''
+	const hiddenCameras = new Set(currentPresentation().hiddenCameras)
+	for (const camera of self.apiCameras.filter((camera) => !hiddenCameras.has(camera.uuid)))
 		for (const control of camera.controls) {
 			if (
 				!['float', 'integer'].includes(control.type) ||
@@ -122,9 +144,9 @@ export function addGraphicsPresets(
 			)
 				continue
 			const id = `gauge_${camera.uuid}_${control.id}`
-			gauges.push(id)
+			addToSection(sections, 'Control gauges', camera.name, id)
 			const group = (control as { group?: string }).group ?? 'system'
-			const accent = channelAccent(control.id, ACCENT[group] ?? ACCENT.system)
+			const accent = channelAccent(control.id, group)
 			definitions[id] = valueTile({
 				name: `${camera.name} · ${control.name ?? control.id}`,
 				label: control.name ?? control.id,
@@ -144,7 +166,7 @@ export function addGraphicsPresets(
 							? [
 									{
 										actionId: 'float_decrease',
-										options: { camera: camera.uuid, property: control.id, step_size: 'normal', user: '' },
+										options: { camera: camera.uuid, property: control.id, step_size: 'normal', user: defaultUser },
 									},
 								]
 							: [],
@@ -152,7 +174,7 @@ export function addGraphicsPresets(
 							? [
 									{
 										actionId: 'float_increase',
-										options: { camera: camera.uuid, property: control.id, step_size: 'normal', user: '' },
+										options: { camera: camera.uuid, property: control.id, step_size: 'normal', user: defaultUser },
 									},
 								]
 							: [],
@@ -162,11 +184,11 @@ export function addGraphicsPresets(
 		}
 	for (const source of self.videoSources) {
 		const id = `video_${source.id}`
-		video.push(id)
+		addToSection(sections, 'Live video · 16:9', 'Sources', id)
 		definitions[id] = liveTile({
 			name: `Live · ${source.name ?? source.id}`,
 			sourceName: source.name ?? source.id,
-			accent: ACCENT.monitor,
+			accent: tone('monitor'),
 			steps: [{ down: [], up: [] }],
 			localVariables: [
 				{
@@ -178,6 +200,4 @@ export function addGraphicsPresets(
 			],
 		})
 	}
-	if (gauges.length) sections.push({ id: 'control-gauges', name: 'Control gauges', definitions: gauges })
-	if (video.length) sections.push({ id: 'live-video', name: 'Live video · 16:9', definitions: video })
 }

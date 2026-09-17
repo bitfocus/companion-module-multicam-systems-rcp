@@ -20,6 +20,7 @@ import {
 	type VideoSource,
 	type Control,
 	type ControllerState,
+	Presentation,
 } from './api.js'
 import type {
 	WebsocketCamerasOutput,
@@ -41,6 +42,7 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 	api: IntegrationApi | null = null
 	connected = false
 	apiCameras: ApiCamera[] = []
+	presentation: Partial<Presentation> | undefined
 	controllerSwitchers: ControllerState | undefined
 	videoSources: VideoSource[] = []
 	images = new ImageFeeds(
@@ -323,6 +325,7 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 				]
 			}),
 			state.videoSources,
+			state.presentation,
 			state.controllerSwitchers?.switchers.map(({ selectedChoiceId: _selection, ...definition }) => definition),
 		])
 		const changed = this.lastTopology !== topology
@@ -330,6 +333,7 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 		this.connected = true
 		this.updateStatus(InstanceStatus.Ok)
 		this.apiCameras = state.cameras ?? []
+		this.presentation = state.presentation
 		this.controllerSwitchers = state.controllerSwitchers
 		this.videoSources = this.config.connection === 'cloud' ? [] : (state.videoSources ?? [])
 		this.cameras = this.apiCameras.map((camera) => ({
