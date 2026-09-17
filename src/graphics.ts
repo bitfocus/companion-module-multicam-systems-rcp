@@ -148,7 +148,7 @@ export function addGraphicsPresets(
 			const group = (control as { group?: string }).group ?? 'system'
 			const accent = channelAccent(control.id, group)
 			definitions[id] = valueTile({
-				name: `${camera.name} · ${control.name ?? control.id}`,
+				name: `${camera.name} · ${control.name ?? control.id} · Gauge / rotary`,
 				label: control.name ?? control.id,
 				accent,
 				source: controlSource(

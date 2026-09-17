@@ -26,9 +26,10 @@ Preset actions use human-facing numbers 1–1000, mapped to API slots 0–999.
 
 Existing action and feedback IDs are retained. Presets are Companion 5 layered buttons,
 arranged in sections per camera, user and router with a group per control family.
-Numeric controls show a ring gauge with the live value; **Rotary** presets go on a
-Stream Deck + LCD strip and turn the encoder below it. **Control gauges** are read-only
-levels for any numeric control. A disconnected value shows a dash.
+Every numeric control has a **Gauge / rotary** preset: a ring gauge with the live value
+that also carries the encoder's rotate actions, so the same preset serves a button, a
+Stream Deck + LCD segment or the encoder under it. **Control gauges** list the same
+tiles for every camera. A disconnected value shows a dash.
 
 The look and the offered devices are chosen on the RCP under **Setup → Companion
 buttons**: ring, bar or plain gauges, colour per control group / one colour / monochrome,

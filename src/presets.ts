@@ -6,7 +6,6 @@ import type { ModuleInstance, ModuleTypes } from './main.js'
 import {
 	INK,
 	TALLY,
-	banner,
 	channelAccent,
 	applyPresentation,
 	tone,
@@ -14,7 +13,6 @@ import {
 	labelTile,
 	numberTile,
 	pillTile,
-	rotaryTile,
 	stepTile,
 	tallyTile,
 	toggleTile,
@@ -178,12 +176,6 @@ export function UpdatePresets(self: ModuleInstance): void {
 
 		for (const group of sortedGroups) {
 			const displayName = GROUP_ORDER[group]?.displayName ?? formatPropertyName(group)
-			const groupAccent = tone(group)
-			presets[`cam_${camIdShort}_group_${group}`] = {
-				...banner(`[${displayName}]`, displayName, groupAccent),
-				category: folderName,
-				group: displayName,
-			}
 
 			for (const prop of grouped[group].sort()) {
 				const info = describe(cameraUuid, prop)
@@ -226,11 +218,18 @@ export function UpdatePresets(self: ModuleInstance): void {
 					if (source) {
 						presets[`cam_${camIdShort}_${propIdShort}_val`] = {
 							...valueTile({
-								name: `${info.label} Value`,
+								name: `${info.label} · Gauge / rotary`,
 								label: info.label,
 								accent: info.accent,
 								source,
-								steps: [{ down: [], up: [] }],
+								steps: [
+									{
+										down: [],
+										up: [],
+										rotate_left: [{ actionId: 'float_decrease', options: floatOptions }],
+										rotate_right: [{ actionId: 'float_increase', options: floatOptions }],
+									},
+								],
 							}),
 							category: folderName,
 							group: displayName,
@@ -368,11 +367,6 @@ export function UpdatePresets(self: ModuleInstance): void {
 			}
 		}
 
-		presets[`cam_${camIdShort}_ptz_header`] = {
-			...banner('[PTZ Presets]', 'PTZ presets', tone('ptz')),
-			category: folderName,
-			group: 'PTZ presets',
-		}
 		for (let presetNum = 1; presetNum <= 20; presetNum++) {
 			const ptzOptions = isUserCamera
 				? { camera: cameraUuid, preset: presetNum, action: 'user_setting', mode: 'user_setting', user: userUuid }
@@ -392,53 +386,6 @@ export function UpdatePresets(self: ModuleInstance): void {
 	})
 
 	// ===================
-	// ROTARY FOLDERS: one ring tile per numeric control, for the Stream Deck + encoders
-	// ===================
-	visibleCameras.forEach((camera, cameraIndex) => {
-		const camNum = cameraIndex + 1
-		const cameraDisplayName = displayNames.get(camera.uuid) ?? getCameraDisplayName(camera, self.users, camNum)
-		const cameraUuid = camera.uuid
-		const camIdShort = cameraUuid.substring(0, 8)
-		const assignedUser = self.users.find((u) => u.attachedVirtualCameraUuid === camera.uuid)
-		const isUserCamera = !!assignedUser
-		const userUuid = assignedUser?.uuid || ''
-		const rotaryFolderName = isUserCamera
-			? `Rotary: User selected: ${cameraDisplayName}`
-			: `Rotary: ${cameraDisplayName}`
-		const floatProperties = (camera.assignedModuleControlProperties || []).filter(
-			(prop) => describe(cameraUuid, prop).kind === 'float',
-		)
-		if (floatProperties.length === 0) return
-
-		for (const prop of floatProperties) {
-			const info = describe(cameraUuid, prop)
-			const propIdShort = prop.substring(0, 16)
-			const floatOptions = isUserCamera
-				? { camera: cameraUuid, property: prop, step_size: 'user_setting', user: userUuid }
-				: { camera: cameraUuid, property: prop, step_size: 'normal', user: defaultUser }
-			const source = controlSource(cameraUuid, prop, info.min, info.max, info.unit)
-			presets[`rotary_${camIdShort}_${propIdShort}`] = {
-				...rotaryTile({
-					name: `${info.label} · Encoder`,
-					label: info.label,
-					accent: info.accent,
-					source,
-					steps: [
-						{
-							down: [],
-							up: [],
-							rotate_left: [{ actionId: 'float_decrease', options: floatOptions }],
-							rotate_right: [{ actionId: 'float_increase', options: floatOptions }],
-						},
-					],
-				}),
-				category: rotaryFolderName,
-				group: GROUP_ORDER[info.group]?.displayName ?? formatPropertyName(info.group),
-			}
-		}
-	})
-
-	// ===================
 	// CONTROLLER CHOICES and USER CONTROLS
 	// ===================
 	Object.assign(presets, controllerPresets(self))
@@ -450,11 +397,6 @@ export function UpdatePresets(self: ModuleInstance): void {
 		const userIdShort = userUuid.substring(0, 8)
 		const folderName = `User controls: ${userName}`
 
-		presets[`user_${userIdShort}_stepsize_header`] = {
-			...banner('[Adjust Step Size]', 'Step size', tone('user')),
-			category: folderName,
-			group: 'Step size',
-		}
 		for (const size of [
 			{ id: 'big', label: 'Big', activeColor: 0xf87171 },
 			{ id: 'normal', label: 'Normal', activeColor: 0x34d399 },
@@ -477,11 +419,6 @@ export function UpdatePresets(self: ModuleInstance): void {
 			}
 		}
 
-		presets[`user_${userIdShort}_ptzmode_header`] = {
-			...banner('[PTZ Mode]', 'PTZ mode', tone('ptz')),
-			category: folderName,
-			group: 'PTZ mode',
-		}
 		for (const mode of [
 			{ id: 'normal', label: 'Normal', activeColor: 0x34d399 },
 			{ id: 'tracing', label: 'Tracing', activeColor: 0xfbbf24 },
@@ -504,11 +441,6 @@ export function UpdatePresets(self: ModuleInstance): void {
 			}
 		}
 
-		presets[`user_${userIdShort}_ptzaction_header`] = {
-			...banner('[PTZ Action]', 'PTZ action', tone('ptz')),
-			category: folderName,
-			group: 'PTZ action',
-		}
 		for (const action of [
 			{ id: 'recall', label: 'Recall', activeColor: 0x34d399 },
 			{ id: 'store', label: 'Store', activeColor: 0xf87171 },

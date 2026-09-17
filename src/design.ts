@@ -133,7 +133,17 @@ function text(
 	partial: Omit<ButtonGraphicsTextElement, 'type'> & { height: number; fontsize: number },
 ): ButtonGraphicsTextElement {
 	const scale = Number.isFinite(presentation.textScale) ? Math.min(1.6, Math.max(0.7, presentation.textScale)) : 1
-	const fontsize = Math.min(200, Math.max(3, Math.round(((partial.fontsize * scale) / partial.height) * 100)))
+	// The RCP's text scale is for the property text (labels, captions, hints), not the value.
+	// Companion sizes text by its box, so the box grows around its centre with the scale.
+	const scaled = ['label', 'caption', 'subtitle', 'step', 'waiting'].includes(partial.id ?? '')
+	let y = typeof partial.y === 'number' ? partial.y : 0
+	let height = partial.height
+	if (scaled && scale !== 1) {
+		const grown = Math.min(height * scale, 60)
+		y = Math.max(0, Math.min(100 - grown, y - (grown - height) / 2))
+		height = grown
+	}
+	const fontsize = Math.min(200, Math.max(3, Math.round((partial.fontsize / partial.height) * 100)))
 	return {
 		type: 'text',
 		color: INK.text,
@@ -141,6 +151,8 @@ function text(
 		valign: 'center',
 		fontsizeAllowShrink: true,
 		...partial,
+		y,
+		height,
 		fontsize,
 	}
 }
