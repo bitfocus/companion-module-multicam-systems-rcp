@@ -18,8 +18,19 @@ Controls use discovered camera IDs and available properties. Numeric increment/d
 runs against current server state, with the server's small/normal/big steps. User camera
 selection, routing, and PTZ/scene preset recall/store/clear use the same owners as the RCP app.
 
-**Continuous movement and tracing are unavailable in the API preview.** Requests are
-rejected explicitly. PTZ preset recall remains available. Camera readback is separate
+**Continuous movement is unavailable in the API preview.** Requests are
+rejected explicitly. PTZ preset recall remains available.
+
+**Tracing** (recorded PTZ paths, RCP with tracing in the integration API): use the preset
+actions in Tracing mode. _Store_ starts recording the camera's path into the preset and a
+second _Store_ saves it; store on several cameras with one button to record them together,
+so they play back in step. _Recall_ plays the path from its start (a repeated recall
+starts it again, it never stops it). The camera's **Tracing speed** control sets the pace
+(1 = as recorded, 0 holds the head): put a _Float: Adjust Property_ for each camera on one
+rotary encoder to drive a group, or set it to 0 before the recall so every camera waits at
+its start. **Tracing: Stop** ends a playback; recalling a normal PTZ preset ends it too. The
+**Tracing: Camera State** feedback and the `camera_N_tracing_status`, `_preset`,
+`_progress` and `_remaining` variables show what each camera does. Camera readback is separate
 from command admission; accepting a command does not prove that hardware completed it.
 
 Preset actions use human-facing numbers 1–1000, mapped to API slots 0–999.

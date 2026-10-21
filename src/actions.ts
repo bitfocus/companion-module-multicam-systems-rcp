@@ -638,6 +638,29 @@ export function UpdateActions(self: ModuleInstance): void {
 		},
 	}
 
+	actions['tracing_stop'] = {
+		name: 'Tracing: Stop',
+		description:
+			"End the camera's tracing playback and stop the head where it is. Start one with PTZ: Recall Preset in Tracing mode (it plays the path from its start; speed comes from the camera's Tracing speed control, 0 waits at the start).",
+		options: [
+			{
+				id: 'camera',
+				type: 'dropdown',
+				label: 'Camera',
+				choices: cameraChoices,
+				default: cameraChoices[0]?.id || '',
+			},
+		],
+		callback: async (action) => {
+			const cameraUuid = self.getTargetCameraUuid(action.options.camera as string)
+			if (!cameraUuid) {
+				self.log('warn', 'No target camera available')
+				return
+			}
+			self.tracingStop(cameraUuid)
+		},
+	}
+
 	actions['clear_preset'] = {
 		name: 'PTZ: Clear Preset',
 		description: 'Clear a PTZ preset on a camera',

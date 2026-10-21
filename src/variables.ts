@@ -55,6 +55,15 @@ export function UpdateVariableDefinitions(self: ModuleInstance): void {
 			name: `Camera ${camNum} Tally Color`,
 		})
 
+		for (const [suffix, label] of [
+			['tracing_status', 'Tracing Status'],
+			['tracing_preset', 'Tracing Preset'],
+			['tracing_progress', 'Tracing Progress (%)'],
+			['tracing_remaining', 'Tracing Time Left (s)'],
+		]) {
+			variables.push({ variableId: `${prefix}_${suffix}`, name: `Camera ${camNum} ${label}` })
+		}
+
 		// Dynamic properties from assignedModuleControlProperties
 		const properties = camera.assignedModuleControlProperties || []
 		properties.forEach((property) => {
@@ -146,6 +155,19 @@ export function UpdateVariableValues(self: ModuleInstance): void {
 		const tallyColor = self.connected ? self.getCameraTallyColor(camera.uuid) : 'off'
 		values[`${prefix}_tally`] = tallyColor
 		values[`${prefix}_tally_color`] = tallyColor
+
+		const tracing = self.getCameraTracing(camera.uuid)
+		const tracingStatus = tracing?.status ?? 'idle'
+		values[`${prefix}_tracing_status`] =
+			tracingStatus === 'playing' && tracing?.arriving
+				? 'arriving'
+				: tracingStatus === 'playing' && tracing?.paused
+					? 'paused'
+					: tracingStatus
+		values[`${prefix}_tracing_preset`] = tracing?.presetNumber != null ? tracing.presetNumber + 1 : ''
+		values[`${prefix}_tracing_progress`] = tracing?.progress != null ? Math.round(tracing.progress * 100) : ''
+		values[`${prefix}_tracing_remaining`] =
+			tracing?.remainingMs != null ? Math.round(tracing.remainingMs / 100) / 10 : ''
 
 		// Dynamic properties from cached values (use 0-based index for internal lookup)
 		const properties = camera.assignedModuleControlProperties || []
