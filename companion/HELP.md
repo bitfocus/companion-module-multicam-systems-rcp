@@ -33,7 +33,7 @@ its start. **Tracing: Stop** ends a playback; recalling a normal PTZ preset ends
 `_progress` and `_remaining` variables show what each camera does. Camera readback is separate
 from command admission; accepting a command does not prove that hardware completed it.
 
-Preset actions use human-facing numbers 1–1000, mapped to API slots 0–999.
+Preset numbers are the ones the RCP shows: Preset 1 on a camera is preset 1 here (up to 999).
 
 Existing action and feedback IDs are retained. Presets are Companion 5 layered buttons,
 arranged in sections per camera, user and router with a group per control family.

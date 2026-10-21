@@ -245,7 +245,7 @@ test('preset commands carry the current controller generation and fail closed wi
 			type: `preset${operation[0].toUpperCase() + operation.slice(1)}`,
 			cameraId: 'logical-slot',
 			kind: 'ptz',
-			number: 2,
+			number: 3,
 			expectedGeneration: 12,
 		})
 	}

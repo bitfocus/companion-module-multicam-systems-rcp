@@ -164,7 +164,7 @@ export function UpdateVariableValues(self: ModuleInstance): void {
 				: tracingStatus === 'playing' && tracing?.paused
 					? 'paused'
 					: tracingStatus
-		values[`${prefix}_tracing_preset`] = tracing?.presetNumber != null ? tracing.presetNumber + 1 : ''
+		values[`${prefix}_tracing_preset`] = tracing?.presetNumber ?? ''
 		values[`${prefix}_tracing_progress`] = tracing?.progress != null ? Math.round(tracing.progress * 100) : ''
 		values[`${prefix}_tracing_remaining`] =
 			tracing?.remainingMs != null ? Math.round(tracing.remainingMs / 100) / 10 : ''

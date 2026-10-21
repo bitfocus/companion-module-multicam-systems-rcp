@@ -563,7 +563,8 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 				],
 				cameraId: cameraUuid,
 				kind: preset[2] || 'ptz',
-				number: Number(value) - 1,
+				// The RCP's own preset numbers: its "Preset 1" is number 1.
+				number: Number(value),
 			})
 			return
 		}

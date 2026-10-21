@@ -430,7 +430,7 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 			const tracing = cameraUuid ? self.getCameraTracing(cameraUuid) : undefined
 			const status = tracing?.status ?? 'idle'
 			const preset = Number(feedback.options.preset) || 0
-			if (preset > 0 && tracing?.presetNumber !== preset - 1) return feedback.options.state === 'idle'
+			if (preset > 0 && tracing?.presetNumber !== preset) return feedback.options.state === 'idle'
 			const playing = status === 'playing'
 			switch (feedback.options.state) {
 				case 'active':
