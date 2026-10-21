@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes a Multicam RCP connection and a tracing demo page into Companion 5.1's DB.
+r"""Writes a Multicam RCP connection and a tracing demo page into Companion 5.1's DB.
 
 Page 1 becomes TRACING: camera tiles, AUTO ON (speed 0 + recall a tracing preset on every
 camera), AUTO OFF (recall a normal preset), record, stop, speed presets and a speed dial.
@@ -29,6 +29,9 @@ CAMS = [
     ("02e39c58-ad0f-4997-a2c3-fa00f08bdbb3", "CAM 4", 4),
 ]
 OVERVIEW_PRESET = 1  # normal PTZ preset recalled by AUTO OFF
+# Companion checks every dropdown against its choices, the unused "user" option too:
+# any user of the project (only read when an action is set to "Use User Setting").
+USER = "0a94621d-62d2-4921-93bd-5d9c14587658"
 
 AMBER, RED, GREEN, BLUE, GREY, DARK = 0xFBBF24, 0xDC2626, 0x16A34A, 0x2563EB, 0x3F3F46, 0x18181B
 WHITE, BLACK = 0xFFFFFF, 0x000000
@@ -103,16 +106,16 @@ def speed_set(value, cams=None):
 def auto_on(path, cams=None):
     cams = cams or CAMS
     return speed_set(0, cams) + [
-        action("recall_preset", camera=c[0], preset=path, mode="tracing", user="") for c in cams]
+        action("recall_preset", camera=c[0], preset=path, mode="tracing", user=USER) for c in cams]
 
 
 def record(path, cams=None):
-    return [action("store_preset", camera=c[0], preset=path, mode="tracing", user="") for c in (cams or CAMS)]
+    return [action("store_preset", camera=c[0], preset=path, mode="tracing", user=USER) for c in (cams or CAMS)]
 
 
 def step_speed(direction, cams=None):
     return [action("float_increase" if direction > 0 else "float_decrease", camera=c[0],
-                   property="tracing_speed", step_size="big", user="") for c in (cams or CAMS)]
+                   property="tracing_speed", step_size="big", user=USER) for c in (cams or CAMS)]
 
 
 def status_fb(cam_uuid, state, bg, fg=BLACK, preset=0):
@@ -143,7 +146,7 @@ for col, path in enumerate((1, 2, 3), start=1):
                             feedbacks=[status_fb(lead[0], "playing", AMBER, BLACK, preset=path)])
 grid[(1, 4)] = button(f"AUTO OFF\nPRESET {OVERVIEW_PRESET}",
                       down=each(lambda c: [action("recall_preset", camera=c, preset=OVERVIEW_PRESET,
-                                                  mode="normal", user="")]), bg=BLUE)
+                                                  mode="normal", user=USER)]), bg=BLUE)
 grid[(1, 5)] = button("REC\nPATH 2", down=record(2), bg=GREY,
                       feedbacks=[status_fb(lead[0], "recording", RED, WHITE, preset=2)])
 grid[(1, 6)] = button("REC\nPATH 3", down=record(3), bg=GREY,
@@ -165,7 +168,7 @@ grid[(3, 2)] = button(f"{lead[1]}\nREC 1", down=record(1, only), bg=GREY,
 grid[(3, 3)] = button(f"{lead[1]}\nSTOP", down=[action("tracing_stop", camera=lead[0])], bg=RED)
 grid[(3, 4)] = button(f"{lead[1]}\nSPEED 1x", down=speed_set(1.0, only), bg=BLACK)
 grid[(3, 5)] = button(f"{lead[1]}\nPRESET {OVERVIEW_PRESET}",
-                      down=[action("recall_preset", camera=lead[0], preset=OVERVIEW_PRESET, mode="normal", user="")],
+                      down=[action("recall_preset", camera=lead[0], preset=OVERVIEW_PRESET, mode="normal", user=USER)],
                       bg=BLUE)
 
 con = sqlite3.connect(DB)
