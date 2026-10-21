@@ -58,7 +58,7 @@ export function UpdateVariableDefinitions(self: ModuleInstance): void {
 		for (const [suffix, label] of [
 			['tracing_status', 'Tracing Status'],
 			['tracing_preset', 'Tracing Preset'],
-			['tracing_progress', 'Tracing Progress (%)'],
+			['tracing_progress', 'Tracing Progress'],
 			['tracing_remaining', 'Tracing Time Left (s)'],
 		]) {
 			variables.push({ variableId: `${prefix}_${suffix}`, name: `Camera ${camNum} ${label}` })
@@ -165,7 +165,7 @@ export function UpdateVariableValues(self: ModuleInstance): void {
 					? 'paused'
 					: tracingStatus
 		values[`${prefix}_tracing_preset`] = tracing?.presetNumber ?? ''
-		values[`${prefix}_tracing_progress`] = tracing?.progress != null ? Math.round(tracing.progress * 100) : ''
+		values[`${prefix}_tracing_progress`] = tracing?.progress != null ? `${Math.round(tracing.progress * 100)}%` : ''
 		values[`${prefix}_tracing_remaining`] =
 			tracing?.remainingMs != null ? Math.round(tracing.remainingMs / 100) / 10 : ''
 
