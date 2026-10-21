@@ -32,6 +32,19 @@ export interface Camera {
 	controls: Control[]
 	tally: unknown
 	presets: { kind: string; number: number; name: string | null }[]
+	/** The camera's tracing (recorded PTZ path) activity; absent on older RCPs. */
+	tracing?: Tracing
+}
+export interface Tracing {
+	status: 'idle' | 'recording' | 'playing' | 'calibrating' | 'scanning'
+	presetNumber: number | null
+	/** While playing: the head is still on its way to the path's start. */
+	arriving?: boolean
+	paused?: boolean
+	progressMode?: 'timed' | 'operator'
+	/** While playing: 0–1 along the path. */
+	progress?: number
+	remainingMs?: number
 }
 export interface VideoSource {
 	id: string

@@ -385,6 +385,74 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 	// Connection Feedbacks
 	// ===================
 
+	feedbacks['tracing_state'] = {
+		type: 'boolean',
+		name: 'Tracing: Camera State',
+		description: "True while the camera's tracing is in the chosen state (optionally for one preset)",
+		defaultStyle: {
+			bgcolor: combineRgb(251, 191, 36),
+			color: combineRgb(0, 0, 0),
+		},
+		options: [
+			{
+				id: 'camera',
+				type: 'dropdown',
+				label: 'Camera',
+				choices: cameraChoices,
+				default: cameraChoices[0]?.id || '',
+			},
+			{
+				id: 'state',
+				type: 'dropdown',
+				label: 'State',
+				choices: [
+					{ id: 'active', label: 'Any activity' },
+					{ id: 'playing', label: 'Playing (incl. on its way to the start)' },
+					{ id: 'arriving', label: 'On its way to the start' },
+					{ id: 'running', label: 'Playing and moving' },
+					{ id: 'paused', label: 'Playing, held (speed 0)' },
+					{ id: 'recording', label: 'Recording' },
+					{ id: 'idle', label: 'Idle' },
+				],
+				default: 'playing',
+			},
+			{
+				id: 'preset',
+				type: 'number',
+				label: 'Preset Number (0 = any)',
+				default: 0,
+				min: 0,
+				max: 1000,
+			},
+		],
+		callback: (feedback) => {
+			const cameraUuid = self.getTargetCameraUuid(feedback.options.camera as string)
+			const tracing = cameraUuid ? self.getCameraTracing(cameraUuid) : undefined
+			const status = tracing?.status ?? 'idle'
+			const preset = Number(feedback.options.preset) || 0
+			if (preset > 0 && tracing?.presetNumber !== preset - 1) return feedback.options.state === 'idle'
+			const playing = status === 'playing'
+			switch (feedback.options.state) {
+				case 'active':
+					return status !== 'idle'
+				case 'playing':
+					return playing
+				case 'arriving':
+					return playing && tracing?.arriving === true
+				case 'running':
+					return playing && !tracing?.arriving && !tracing?.paused
+				case 'paused':
+					return playing && !tracing?.arriving && tracing?.paused === true
+				case 'recording':
+					return status === 'recording'
+				case 'idle':
+					return status === 'idle'
+				default:
+					return false
+			}
+		},
+	}
+
 	feedbacks['connected'] = {
 		type: 'boolean',
 		name: 'Connected to Server',

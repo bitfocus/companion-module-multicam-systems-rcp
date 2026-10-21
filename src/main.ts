@@ -20,6 +20,7 @@ import {
 	type VideoSource,
 	type Control,
 	type ControllerState,
+	type Tracing,
 	Presentation,
 } from './api.js'
 import type { BankId } from './deck.js'
@@ -550,10 +551,6 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 	setProperty(cameraUuid: string, property: string, value: PropertyValue): void {
 		const preset = /^(recall|store|clear)_preset(?:_(scene|tracing))?$/.exec(property)
 		if (preset) {
-			if (preset[2] === 'tracing') {
-				this.log('warn', 'This preset operation is not available in the API preview')
-				return
-			}
 			const expectedGeneration = this.controllerSwitchers?.generation
 			if (!Number.isSafeInteger(expectedGeneration)) {
 				this.log('warn', 'Controller assignment state unavailable')
@@ -583,6 +580,16 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 			expectedCameraId: control.resolvedCameraId,
 		})
 	}
+	/** Ends the camera's tracing playback (or calibration/scan) and stops the head. */
+	tracingStop(cameraUuid: string): void {
+		this.command({ type: 'tracingStop', cameraId: cameraUuid })
+	}
+
+	/** The camera's tracing activity as the RCP last reported it. */
+	getCameraTracing(cameraUuid: string): Tracing | undefined {
+		return this.apiCameras.find((c) => c.uuid === cameraUuid)?.tracing
+	}
+
 	private stepProperty(
 		cameraUuid: string,
 		property: string,
