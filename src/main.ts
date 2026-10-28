@@ -1,6 +1,6 @@
-// Companion 5 (module API 2.x) loads the module from its default export.
+// Companion 4 (module API 1.x) starts the module through runEntrypoint.
+import { runEntrypoint } from '@companion-module/base'
 import { ModuleInstance } from './instance.js'
 import { UpgradeScripts } from './upgrades.js'
 
-export default ModuleInstance
-export { UpgradeScripts }
+runEntrypoint(ModuleInstance, UpgradeScripts)

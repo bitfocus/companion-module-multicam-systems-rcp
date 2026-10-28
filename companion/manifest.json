@@ -3,7 +3,7 @@
 	"name": "multicam-systems-rcp",
 	"shortname": "Multicam RCP",
 	"description": "Remote Control Panel for broadcast camera control - control cameras, manage tally, PTZ presets, and video routing through Multicam RCP",
-	"version": "2.0.0-beta.4",
+	"version": "1.1.0",
 	"license": "MIT",
 	"repository": "git+https://github.com/bitfocus/companion-module-multicam-systems-rcp.git",
 	"bugs": "https://github.com/bitfocus/companion-module-multicam-systems-rcp/issues",
