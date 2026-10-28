@@ -2,6 +2,7 @@ import { controllerActions } from './controllers.js'
 import { deckActions } from './deck.js'
 import type { CompanionActionDefinitions } from '@companion-module/base'
 import type { ModuleInstance } from './main.js'
+import type { FollowZoom } from './api.js'
 
 export function UpdateActions(self: ModuleInstance): void {
 	const actions: CompanionActionDefinitions<
@@ -658,6 +659,182 @@ export function UpdateActions(self: ModuleInstance): void {
 				return
 			}
 			self.tracingStop(cameraUuid)
+		},
+	}
+
+	actions['tracing_speed'] = {
+		name: 'Tracing: Speed (Several Cameras)',
+		description:
+			'One tracing speed on every chosen camera in one pass, so cameras that play in step take it on the same tick (1 = as recorded, 0 holds the head). Up/Down step from the first camera’s speed; put them on a rotary encoder for a speed lever.',
+		options: [
+			{
+				id: 'cameras',
+				type: 'multidropdown',
+				label: 'Cameras',
+				choices: cameraChoices,
+				default: cameraChoices[0] ? [cameraChoices[0].id] : [],
+			},
+			{
+				id: 'mode',
+				type: 'dropdown',
+				label: 'Mode',
+				choices: [
+					{ id: 'set', label: 'Set' },
+					{ id: 'up', label: 'Up by step' },
+					{ id: 'down', label: 'Down by step' },
+				],
+				default: 'set',
+				disableAutoExpression: true,
+			},
+			{
+				id: 'speed',
+				type: 'number',
+				label: 'Speed',
+				default: 1,
+				min: 0,
+				max: 10,
+				step: 0.05,
+				isVisibleExpression: `$(options:mode) == 'set'`,
+			},
+			{
+				id: 'step',
+				type: 'number',
+				label: 'Step',
+				default: 0.1,
+				min: 0.01,
+				max: 10,
+				step: 0.01,
+				isVisibleExpression: `$(options:mode) != 'set'`,
+			},
+		],
+		callback: async (action) => {
+			const cameras = ((action.options.cameras as string[]) ?? []).filter((c) => self.getTargetCameraUuid(c))
+			if (!cameras.length) {
+				self.log('warn', 'No target camera available')
+				return
+			}
+			const mode = action.options.mode as string
+			if (mode === 'set') {
+				self.tracingSpeed(cameras, Number(action.options.speed))
+				return
+			}
+			const current = self.getTracingSpeed(cameras[0])
+			if (current === null) {
+				self.log('warn', 'Tracing speed of the first camera is not known yet')
+				return
+			}
+			// Round to the step so repeated turns land on clean values (0.1, 0.2, …), not 0.30000000000000004.
+			const step = Number(action.options.step) || 0.1
+			const next = Math.round((current + (mode === 'up' ? step : -step)) / step) * step
+			self.tracingSpeed(cameras, Number(next.toFixed(4)))
+		},
+	}
+
+	const zoomChoices = [
+		{ id: 'off', label: 'Leave to the operator' },
+		{ id: 'frameWidth', label: 'Keep a frame width at the target' },
+		{ id: 'matchLeader', label: "Match the leader's picture" },
+	]
+	actions['follow_start'] = {
+		name: 'Follow: Start',
+		description:
+			"The camera points where the leader's centre of picture meets a surface of the 3D Tracing site (or the ground at a height). Both cameras need a position on the site. Starting again changes the follow; any other move of the camera ends it.",
+		options: [
+			{
+				id: 'camera',
+				type: 'dropdown',
+				label: 'Follower',
+				choices: cameraChoices,
+				default: cameraChoices[0]?.id || '',
+			},
+			{
+				id: 'leader',
+				type: 'dropdown',
+				label: 'Leader',
+				choices: cameraChoices,
+				default: cameraChoices[1]?.id || cameraChoices[0]?.id || '',
+			},
+			{
+				id: 'surface',
+				type: 'textinput',
+				label: 'Site surface ID (empty: the ground at a height)',
+				default: '',
+			},
+			{
+				id: 'height',
+				type: 'number',
+				label: 'Ground height (m)',
+				default: 0,
+				min: -1000,
+				max: 1000,
+				step: 0.1,
+			},
+			{
+				id: 'zoom',
+				type: 'dropdown',
+				label: 'Zoom',
+				choices: zoomChoices,
+				default: 'off',
+				disableAutoExpression: true,
+			},
+			{
+				id: 'frame_width',
+				type: 'number',
+				label: 'Frame width at the target (m)',
+				default: 30,
+				min: 0.1,
+				max: 10000,
+				step: 0.1,
+				isVisibleExpression: `$(options:zoom) == 'frameWidth'`,
+			},
+		],
+		callback: async (action) => {
+			const camera = self.getTargetCameraUuid(action.options.camera as string)
+			const leader = self.getTargetCameraUuid(action.options.leader as string)
+			if (!camera || !leader) {
+				self.log('warn', 'Choose a follower and a leader camera')
+				return
+			}
+			if (camera === leader) {
+				self.log('warn', 'A camera cannot follow itself')
+				return
+			}
+			const surfaceId = typeof action.options.surface === 'string' ? action.options.surface.trim() : ''
+			const mode = action.options.zoom as string
+			const zoom: FollowZoom =
+				mode === 'frameWidth'
+					? { mode, frameWidthM: Number(action.options.frame_width) || 30 }
+					: mode === 'matchLeader'
+						? { mode }
+						: { mode: 'off' }
+			self.followStart(
+				camera,
+				leader,
+				surfaceId ? { surfaceId } : { heightM: Number(action.options.height) || 0 },
+				zoom,
+			)
+		},
+	}
+
+	actions['follow_stop'] = {
+		name: 'Follow: Stop',
+		description: 'End the camera’s Follow and stop the head where it is.',
+		options: [
+			{
+				id: 'camera',
+				type: 'dropdown',
+				label: 'Camera',
+				choices: cameraChoices,
+				default: cameraChoices[0]?.id || '',
+			},
+		],
+		callback: async (action) => {
+			const camera = self.getTargetCameraUuid(action.options.camera as string)
+			if (!camera) {
+				self.log('warn', 'No target camera available')
+				return
+			}
+			self.followStop(camera)
 		},
 	}
 

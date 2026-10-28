@@ -13,7 +13,7 @@ import type {
 	CompanionPresetDefinitions,
 } from '@companion-module/base'
 import type { ModuleInstance, ModuleTypes } from './main.js'
-import type { Control } from './api.js'
+import { controlText, knownValue, numberOf, type Control } from './api.js'
 import { addToSection, type PresetSections } from './graphics.js'
 import { channelAccent, liveTile, pillTile, slotTile, tone, type Layered } from './design.js'
 
@@ -94,9 +94,7 @@ function slotContext(self: ModuleInstance, options: Record<string, unknown>) {
 }
 
 function numericValue(control: Control | undefined): number | null {
-	const raw = control?.value
-	const value = typeof raw === 'number' ? raw : raw && typeof raw === 'object' && 'value' in raw ? raw.value : null
-	return typeof value === 'number' && Number.isFinite(value) ? value : null
+	return control ? numberOf(knownValue(control)) : null
 }
 
 function userOptions(self: ModuleInstance) {
@@ -206,18 +204,11 @@ export function deckFeedbacks(self: ModuleInstance): CompanionFeedbackDefinition
 		deck_slot_text: {
 			type: 'value',
 			name: 'Deck: Slot value as text',
-			description: 'Percent for 0–1 controls, otherwise the number with its unit.',
+			description: "A named step's label, percent for 0–1 controls, otherwise the number with its unit.",
 			options: [userOptions(self), slotOption],
 			callback: (feedback) => {
 				const { control } = slotContext(self, feedback.options)
-				const value = numericValue(control)
-				if (!control || value === null) return '—'
-				const min = control.min ?? 0
-				const max = control.max ?? 1
-				if (min === 0 && max === 1) return `${Math.round(value * 100)}%`
-				const decimals = Number.isInteger(min) && Number.isInteger(max) && max - min >= 10 ? 0 : 2
-				const unit = (control as { unit?: string | null }).unit
-				return `${value.toFixed(decimals)}${unit ? ' ' + unit : ''}`
+				return (control && controlText(control)) || '—'
 			},
 		},
 		deck_slot_accent: {

@@ -100,7 +100,8 @@ def each(make):
 
 
 def speed_set(value, cams=None):
-    return [action("float_set", camera=c[0], property="tracing_speed", value=value) for c in (cams or CAMS)]
+    # One command for every camera, so cameras that play in step take the speed on the same tick.
+    return [action("tracing_speed", cameras=[c[0] for c in (cams or CAMS)], mode="set", speed=value, step=0.1)]
 
 
 def auto_on(path, cams=None):
@@ -114,8 +115,8 @@ def record(path, cams=None):
 
 
 def step_speed(direction, cams=None):
-    return [action("float_increase" if direction > 0 else "float_decrease", camera=c[0],
-                   property="tracing_speed", step_size="big", user=USER) for c in (cams or CAMS)]
+    return [action("tracing_speed", cameras=[c[0] for c in (cams or CAMS)],
+                   mode="up" if direction > 0 else "down", speed=1, step=0.1)]
 
 
 def status_fb(cam_uuid, state, bg, fg=BLACK, preset=0):

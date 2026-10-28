@@ -233,13 +233,15 @@ function bar(
 	}
 }
 
-/** "42%" for unit ranges, otherwise one decimal; a dash while offline. */
-export function valueText(local: string, min: number, max: number, unit?: string | null): Expr {
+/** "42%" for unit ranges, otherwise one decimal, or the named step's label; a dash while offline. */
+export function valueText(local: string, min: number, max: number, unit?: string | null, labelLocal?: string): Expr {
 	const v = `$(local:${local})`
 	const percent = min === 0 && max === 1
-	const shown = percent
-		? `\`\${toFixed(${v} * 100, 0)}%\``
-		: `\`\${toFixed(${v}, ${Number.isInteger(min) && Number.isInteger(max) && max - min >= 10 ? 0 : 2})}${unit ? ' ' + unit : ''}\``
+	const shown = labelLocal
+		? `$(local:${labelLocal})`
+		: percent
+			? `\`\${toFixed(${v} * 100, 0)}%\``
+			: `\`\${toFixed(${v}, ${Number.isInteger(min) && Number.isInteger(max) && max - min >= 10 ? 0 : 2})}${unit ? ' ' + unit : ''}\``
 	return expr(`(${v} === undefined || ${v} === null) ? '—' : ${shown}`)
 }
 
@@ -248,23 +250,40 @@ export interface ValueSource {
 	min: number
 	max: number
 	unit?: string | null
+	/** A local variable holding the value as text (a named step's label), shown instead of the number. */
+	labelLocal?: string
 	localVariables: LocalVariables
 }
-/** A numeric control read as a local variable through the control_value feedback. */
+/**
+ * A numeric control read as a local variable through the control_value feedback; a control
+ * with named steps (gain in dB, shutter speeds) also reads its label through control_text.
+ */
 export function controlSource(
 	camera: string,
 	property: string,
 	min: number,
 	max: number,
 	unit?: string | null,
+	namedSteps = false,
 ): ValueSource {
 	return {
 		local: 'level',
 		min,
 		max,
 		unit,
+		labelLocal: namedSteps ? 'label' : undefined,
 		localVariables: [
 			{ variableType: 'feedback', variableName: 'level', feedbackId: 'control_value', options: { camera, property } },
+			...(namedSteps
+				? [
+						{
+							variableType: 'feedback' as const,
+							variableName: 'label',
+							feedbackId: 'control_text',
+							options: { camera, property },
+						},
+					]
+				: []),
 		],
 	}
 }
@@ -308,7 +327,7 @@ export function banner(name: string, title: string, accent: number): Layered {
  */
 function levelTile(t: TileBase & { label: string; source: ValueSource }, stripe: boolean): Layered {
 	const { source } = t
-	const value = valueText(source.local, source.min, source.max, source.unit)
+	const value = valueText(source.local, source.min, source.max, source.unit, source.labelLocal)
 	const base: SomeButtonGraphicsElement[] = stripe ? surface(t.accent) : [box('bg', 0, 0, 100, 100, INK.bg)]
 	const elements: SomeButtonGraphicsElement[] =
 		presentation.theme === 'rings'
@@ -359,7 +378,8 @@ export function stepTile(
 		text({ id: 'label', text: t.label, x: 8, y: 4, width: 90, height: 24, fontsize: 11, color: INK.muted }),
 	]
 	const shownValue =
-		t.valueText ?? (t.source ? valueText(t.source.local, t.source.min, t.source.max, t.source.unit) : undefined)
+		t.valueText ??
+		(t.source ? valueText(t.source.local, t.source.min, t.source.max, t.source.unit, t.source.labelLocal) : undefined)
 	if (t.showValue && shownValue !== undefined) {
 		elements.push(
 			text({

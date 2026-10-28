@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import { WebSocketServer } from 'ws'
-import { IntegrationApi, ImageFeeds, reduceState } from './dist/api.js'
+import { IntegrationApi, ImageFeeds, reduceState, controlText, knownValue, stepLabel } from './dist/api.js'
 
 async function until(predicate, timeout = 3000) {
 	const deadline = Date.now() + timeout
@@ -253,4 +253,35 @@ test('preset commands carry the current controller generation and fail closed wi
 	ModuleInstance.prototype.setProperty.call(host, 'logical-slot', 'recall_preset', 3)
 	assert.equal(sent.length, 3)
 	assert.equal(warnings.length, 1)
+})
+
+test('control text follows the camera definition: unknown readback, named steps, enums, units', () => {
+	const base = { id: 'x', writable: true, behavior: 'absolute', resolvedCameraId: 'a', desired: null, unit: null }
+	const gain = {
+		...base,
+		type: 'float',
+		min: 0,
+		max: 1,
+		value: 0.41,
+		actual: null,
+		steps: [
+			{ value: 0, label: '0 dB' },
+			{ value: 0.4, label: '6 dB' },
+			{ value: 1, label: '12 dB' },
+		],
+	}
+	assert.equal(stepLabel(gain, 0.41), '6 dB')
+	assert.equal(controlText(gain), '6 dB')
+	// A control the device reports is unknown until it has reported, whatever the cache holds.
+	const reported = { ...gain, readback: true }
+	assert.equal(knownValue(reported), null)
+	assert.equal(controlText(reported), null)
+	assert.equal(controlText({ ...reported, actual: { value: 1, reportedAtMs: 1 }, value: 1 }), '12 dB')
+	assert.equal(controlText({ ...base, type: 'float', min: 0, max: 1, value: 0.5, actual: null }), '50%')
+	assert.equal(
+		controlText({ ...base, type: 'float', min: 2000, max: 9000, value: 5600, actual: null, unit: 'K' }),
+		'5600 K',
+	)
+	assert.equal(controlText({ ...base, type: 'enum', value: { index: 3, value: 'Auto' }, actual: null }), 'Auto')
+	assert.equal(controlText({ ...base, type: 'boolean', value: true, actual: null }), 'On')
 })

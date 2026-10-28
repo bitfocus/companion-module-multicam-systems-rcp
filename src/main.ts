@@ -21,7 +21,11 @@ import {
 	type Control,
 	type ControllerState,
 	type Tracing,
+	type Follow,
+	type FollowZoom,
 	Presentation,
+	knownValue,
+	numberOf,
 } from './api.js'
 import type { BankId } from './deck.js'
 import type {
@@ -320,8 +324,18 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 				c.uuid,
 				c.name,
 				c.videoSourceId ?? null,
+				// A control the device turns away for now (`unavailable`) keeps its preset: that comes
+				// and goes with the camera's own state (knee on Auto), like a value.
 				c.controls.map(
-					({ value: _value, actual: _actual, desired: _desired, resolvedCameraId: _resolved, ...control }) => control,
+					({
+						value: _value,
+						actual: _actual,
+						desired: _desired,
+						resolvedCameraId: _resolved,
+						unavailable,
+						writable,
+						...control
+					}) => ({ ...control, writable: writable || unavailable !== undefined }),
 				),
 			]),
 			(state.users as { uuid: string; name: string; attachedVirtualCameraUuid?: string }[] | undefined)?.map((u) => [
@@ -359,7 +373,7 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 		this.propertyValues.clear()
 		this.apiCameras.forEach((camera, index) => {
 			for (const control of camera.controls)
-				this.propertyValues.set(`camera_${index}_${control.id}`, control.value as PropertyValue)
+				this.propertyValues.set(`camera_${index}_${control.id}`, knownValue(control) as PropertyValue)
 			this.propertyValues.set(`camera_${index}_tally`, camera.tally as PropertyValue)
 		})
 		this.invalidateTallyCache()
@@ -568,11 +582,8 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 			})
 			return
 		}
-		const control = this.control(cameraUuid, property)
-		if (!control?.writable || !control.resolvedCameraId) {
-			this.log('warn', 'Control unavailable')
-			return
-		}
+		const control = this.writableControl(cameraUuid, property)
+		if (!control?.resolvedCameraId) return
 		this.command({
 			type: 'controlSet',
 			cameraId: cameraUuid,
@@ -581,9 +592,51 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 			expectedCameraId: control.resolvedCameraId,
 		})
 	}
+	/** The control when the camera takes it now; otherwise logs why not (the device's own reason when it gives one). */
+	private writableControl(cameraUuid: string, property: string): Control | undefined {
+		const control = this.control(cameraUuid, property)
+		if (control?.writable && control.resolvedCameraId) return control
+		const camera = this.apiCameras.find((c) => c.uuid === cameraUuid)?.name ?? cameraUuid
+		const reason = control?.unavailable?.trim() || (control ? 'not writable' : 'the camera has no such control')
+		this.log('warn', `${camera} ${control?.name ?? property}: ${reason}`)
+		return undefined
+	}
 	/** Ends the camera's tracing playback (or calibration/scan) and stops the head. */
 	tracingStop(cameraUuid: string): void {
 		this.command({ type: 'tracingStop', cameraId: cameraUuid })
+	}
+	/** One tracing speed on several cameras in one pass, so cameras that play in step take it on the same tick. */
+	tracingSpeed(cameraUuids: string[], speed: number): void {
+		if (!cameraUuids.length) return
+		const clamped = Math.min(10, Math.max(0, speed))
+		for (const camera of cameraUuids) this.sentTracingSpeeds.set(camera, { speed: clamped, at: Date.now() })
+		this.command({ type: 'tracingSpeed', cameraIds: cameraUuids, speed: clamped })
+	}
+	/**
+	 * A camera's tracing speed: the one just sent for a second, so a fast-turned lever steps from
+	 * its own last value rather than from state the RCP has not echoed yet; else as last reported.
+	 */
+	getTracingSpeed(cameraUuid: string): number | null {
+		const sent = this.sentTracingSpeeds.get(cameraUuid)
+		if (sent && Date.now() - sent.at < 1000) return sent.speed
+		const control = this.control(cameraUuid, 'tracing_speed')
+		return control ? numberOf(knownValue(control)) : null
+	}
+	private sentTracingSpeeds = new Map<string, { speed: number; at: number }>()
+	/** Starts or changes a Follow: the camera points where the leader's centre of picture meets a surface. */
+	followStart(
+		cameraUuid: string,
+		leaderUuid: string,
+		target: { surfaceId: string } | { heightM: number },
+		zoom: FollowZoom,
+	): void {
+		this.command({ type: 'followStart', cameraId: cameraUuid, leaderId: leaderUuid, ...target, zoom })
+	}
+	followStop(cameraUuid: string): void {
+		this.command({ type: 'followStop', cameraId: cameraUuid })
+	}
+	getCameraFollow(cameraUuid: string): Follow | undefined {
+		return this.apiCameras.find((c) => c.uuid === cameraUuid)?.follow
 	}
 
 	/** The camera's tracing activity as the RCP last reported it. */
@@ -598,11 +651,8 @@ export class ModuleInstance extends InstanceBase<ModuleTypes> {
 		substep: boolean,
 		bigstep: boolean,
 	): void {
-		const control = this.control(cameraUuid, property)
-		if (!control?.writable || !control.resolvedCameraId) {
-			this.log('warn', 'Control unavailable')
-			return
-		}
+		const control = this.writableControl(cameraUuid, property)
+		if (!control?.resolvedCameraId) return
 		this.command({
 			type: 'controlAdjust',
 			cameraId: cameraUuid,

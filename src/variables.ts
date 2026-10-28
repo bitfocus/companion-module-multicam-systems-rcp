@@ -1,6 +1,7 @@
 import type { CompanionVariableDefinition, CompanionVariableValues } from '@companion-module/base'
 import type { ModuleInstance } from './main.js'
 import type { PropertyValue } from './types.js'
+import { controlText } from './api.js'
 
 /**
  * Update variable definitions based on current camera data
@@ -64,6 +65,13 @@ export function UpdateVariableDefinitions(self: ModuleInstance): void {
 			variables.push({ variableId: `${prefix}_${suffix}`, name: `Camera ${camNum} ${label}` })
 		}
 
+		for (const [suffix, label] of [
+			['follow_status', 'Follow Status'],
+			['follow_leader', 'Follow Leader'],
+		]) {
+			variables.push({ variableId: `${prefix}_${suffix}`, name: `Camera ${camNum} ${label}` })
+		}
+
 		// Dynamic properties from assignedModuleControlProperties
 		const properties = camera.assignedModuleControlProperties || []
 		properties.forEach((property) => {
@@ -72,6 +80,13 @@ export function UpdateVariableDefinitions(self: ModuleInstance): void {
 				name: `Camera ${camNum} ${formatPropertyName(property)}`,
 			})
 		})
+		// A control with named steps (gain in dB, shutter speeds) also reads as its label.
+		for (const control of self.apiCameras[index]?.controls ?? [])
+			if (control.steps?.length)
+				variables.push({
+					variableId: `${prefix}_${control.id}_text`,
+					name: `Camera ${camNum} ${control.name ?? formatPropertyName(control.id)} (as shown)`,
+				})
 	})
 
 	// Per-user variables (1-based for user readability)
@@ -169,6 +184,12 @@ export function UpdateVariableValues(self: ModuleInstance): void {
 		values[`${prefix}_tracing_remaining`] =
 			tracing?.remainingMs != null ? Math.round(tracing.remainingMs / 100) / 10 : ''
 
+		const follow = self.getCameraFollow(camera.uuid)
+		values[`${prefix}_follow_status`] =
+			follow?.status === 'following' && follow.onSurface === false ? 'off surface' : (follow?.status ?? 'idle')
+		values[`${prefix}_follow_leader`] =
+			follow?.status === 'following' ? (self.apiCameras.find((c) => c.uuid === follow.leaderId)?.name ?? '') : ''
+
 		// Dynamic properties from cached values (use 0-based index for internal lookup)
 		const properties = camera.assignedModuleControlProperties || []
 		properties.forEach((property) => {
@@ -176,6 +197,8 @@ export function UpdateVariableValues(self: ModuleInstance): void {
 			const value = self.propertyValues.get(internalKey)
 			values[`${prefix}_${property}`] = formatPropertyValue(value ?? null)
 		})
+		for (const control of self.apiCameras[index]?.controls ?? [])
+			if (control.steps?.length) values[`${prefix}_${control.id}_text`] = controlText(control) ?? ''
 	})
 
 	// Per-user variables (1-based for user readability)
