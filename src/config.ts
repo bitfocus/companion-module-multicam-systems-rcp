@@ -1,4 +1,4 @@
-import type { SomeCompanionConfigField } from '@companion-module/base'
+import type { SomeCompanionConfigField } from './companion.js'
 
 export type ModuleSecrets = { token?: string; cloudClientSecret?: string }
 

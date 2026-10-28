@@ -8,7 +8,8 @@ import {
 	type PresetSections,
 } from './graphics.js'
 import type { CompanionPresetDefinitions } from '@companion-module/base'
-import type { ModuleInstance, ModuleTypes } from './main.js'
+import type { ModuleInstance } from '../instance.js'
+import type { ModuleTypes } from '../companion.js'
 import {
 	INK,
 	TALLY,

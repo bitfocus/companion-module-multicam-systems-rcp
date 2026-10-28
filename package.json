@@ -12,7 +12,7 @@
 		"dev": "tsc -p tsconfig.build.json --watch",
 		"lint:raw": "eslint",
 		"lint": "yarn lint:raw .",
-		"test": "yarn build:main && node --test test-api.mjs",
+		"test": "yarn build:main && node --test test-api.mjs test-presets.mjs",
 		"design:gallery": "tsx tools/design-gallery.mts"
 	},
 	"license": "MIT",

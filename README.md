@@ -32,8 +32,8 @@ page shows exactly what an operator gets on a Stream Deck. `--label` names a
 pass so several live states sit side by side, `--filter` limits the run to
 matching preset ids or names, `--mode preset` uses Companion's preset preview
 instead of a placed button. Serve the output directory with any static server
-to browse it. The tile builders live in `src/design.ts`; every preset in
-`src/presets.ts`, `src/graphics.ts` and `src/controllers.ts` is composed from them.
+to browse it. The tile builders live in `src/presets/design.ts`; every preset in `src/presets/` is
+composed from them.
 The RCP's Setup → Companion buttons page (`state.presentation` in the API) selects the
 gauge theme, accent mode, top bar and which cameras/routers get presets; the tiles read
 it through `applyPresentation()`.

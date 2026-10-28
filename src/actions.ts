@@ -1,7 +1,7 @@
 import { controllerActions } from './controllers.js'
 import { deckActions } from './deck.js'
-import type { CompanionActionDefinitions } from '@companion-module/base'
-import type { ModuleInstance } from './main.js'
+import type { CompanionActionDefinitions } from './companion.js'
+import type { ModuleInstance } from './instance.js'
 import type { FollowZoom } from './api.js'
 
 export function UpdateActions(self: ModuleInstance): void {
