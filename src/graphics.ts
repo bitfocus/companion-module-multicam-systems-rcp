@@ -46,6 +46,7 @@ export function sectionsToStructure(sections: PresetSections): CompanionPresetSe
 }
 import type { ModuleInstance, ModuleTypes } from './main.js'
 import { channelAccent, controlSource, currentPresentation, liveTile, tone, valueTile } from './design.js'
+import { controlText, knownValue, numberOf } from './api.js'
 
 /** Value feedbacks: read as local variables by the layered tiles. */
 export function graphicsFeedbacks(self: ModuleInstance): CompanionFeedbackDefinitions {
@@ -53,7 +54,7 @@ export function graphicsFeedbacks(self: ModuleInstance): CompanionFeedbackDefini
 		control_value: {
 			type: 'value',
 			name: 'Control numeric value',
-			description: 'Cached/project value. Hardware readback is separately exposed by the API.',
+			description: 'The current value; empty until a control the camera reports has reported.',
 			options: [
 				{
 					type: 'dropdown',
@@ -73,10 +74,34 @@ export function graphicsFeedbacks(self: ModuleInstance): CompanionFeedbackDefini
 			callback: (feedback) => {
 				if (!self.connected) return null
 				const control = self.control(feedback.options.camera as string, feedback.options.property as string)
-				const raw = control?.value
-				const value =
-					typeof raw === 'number' ? raw : raw && typeof raw === 'object' && 'value' in raw ? raw.value : null
-				return typeof value === 'number' && Number.isFinite(value) ? value : null
+				return control ? numberOf(knownValue(control)) : null
+			},
+		},
+		control_text: {
+			type: 'value',
+			name: 'Control value as text',
+			description:
+				"The value as the camera names it: a named step's label (6 dB, 1/50), otherwise the number with its unit. Empty while unknown.",
+			options: [
+				{
+					type: 'dropdown',
+					id: 'camera',
+					label: 'Camera',
+					choices: self.cameraChoices,
+					default: self.cameraChoices[0]?.id ?? '',
+				},
+				{
+					type: 'dropdown',
+					id: 'property',
+					label: 'Control',
+					choices: self.floatPropertyChoices,
+					default: self.floatPropertyChoices[0]?.id ?? '',
+				},
+			],
+			callback: (feedback) => {
+				if (!self.connected) return null
+				const control = self.control(feedback.options.camera as string, feedback.options.property as string)
+				return control ? controlText(control) : null
 			},
 		},
 		camera_tally_state: {
@@ -163,25 +188,21 @@ export function addGraphicsPresets(
 			)
 				continue
 			const id = `gauge_${camera.uuid}_${control.id}`
+			// A control the camera turns away only for now (knee on Auto) keeps its encoder actions.
+			const writable = control.writable || control.unavailable !== undefined
 			addToSection(sections, 'Control gauges', camera.name, id)
-			const group = (control as { group?: string }).group ?? 'system'
+			const group = control.group ?? 'system'
 			const accent = channelAccent(control.id, group)
 			definitions[id] = valueTile({
 				name: `${camera.name} · ${control.name ?? control.id} · Gauge / rotary`,
 				label: control.name ?? control.id,
 				accent,
-				source: controlSource(
-					camera.uuid,
-					control.id,
-					control.min,
-					control.max,
-					(control as { unit?: string | null }).unit,
-				),
+				source: controlSource(camera.uuid, control.id, control.min, control.max, control.unit, !!control.steps?.length),
 				steps: [
 					{
 						down: [],
 						up: [],
-						rotate_left: control.writable
+						rotate_left: writable
 							? [
 									{
 										actionId: 'float_decrease',
@@ -189,7 +210,7 @@ export function addGraphicsPresets(
 									},
 								]
 							: [],
-						rotate_right: control.writable
+						rotate_right: writable
 							? [
 									{
 										actionId: 'float_increase',

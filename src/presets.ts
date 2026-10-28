@@ -151,7 +151,8 @@ export function UpdatePresets(self: ModuleInstance): void {
 		const unit = (control as { unit?: string | null } | undefined)?.unit ?? null
 		const accent = channelAccent(prop, group)
 		const movement = control?.behavior === 'movement'
-		return { kind, group, label, min, max, unit, accent, movement }
+		const namedSteps = !!control?.steps?.length
+		return { kind, group, label, min, max, unit, accent, movement, namedSteps }
 	}
 
 	// ===================
@@ -193,7 +194,7 @@ export function UpdatePresets(self: ModuleInstance): void {
 					const floatOptions = isUserCamera
 						? { camera: cameraUuid, property: prop, step_size: 'user_setting', user: userUuid }
 						: { camera: cameraUuid, property: prop, step_size: 'normal', user: defaultUser }
-					const source = controlSource(cameraUuid, prop, info.min, info.max, info.unit)
+					const source = controlSource(cameraUuid, prop, info.min, info.max, info.unit, info.namedSteps)
 					const up = [{ actionId: 'float_increase' as const, options: floatOptions }]
 					const down = [{ actionId: 'float_decrease' as const, options: floatOptions }]
 					presets[`cam_${camIdShort}_${propIdShort}_inc`] = {

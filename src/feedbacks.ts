@@ -453,6 +453,93 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 		},
 	}
 
+	feedbacks['follow_state'] = {
+		type: 'boolean',
+		name: 'Follow: Camera State',
+		description: 'True while the camera is in the chosen Follow state (3D Tracing)',
+		defaultStyle: {
+			bgcolor: combineRgb(56, 189, 248),
+			color: combineRgb(0, 0, 0),
+		},
+		options: [
+			{
+				id: 'camera',
+				type: 'dropdown',
+				label: 'Camera',
+				choices: cameraChoices,
+				default: cameraChoices[0]?.id || '',
+			},
+			{
+				id: 'state',
+				type: 'dropdown',
+				label: 'State',
+				choices: [
+					{ id: 'following', label: 'Following' },
+					{ id: 'on_surface', label: 'Following, the leader looks at the surface' },
+					{ id: 'off_surface', label: 'Following, the leader looks past the surface (range held)' },
+					{ id: 'idle', label: 'Not following' },
+				],
+				default: 'following',
+			},
+			{
+				id: 'leader',
+				type: 'dropdown',
+				label: 'Leader',
+				choices: [{ id: '', label: 'Any leader' }, ...cameraChoices],
+				default: '',
+			},
+		],
+		callback: (feedback) => {
+			const cameraUuid = self.getTargetCameraUuid(feedback.options.camera as string)
+			const follow = cameraUuid ? self.getCameraFollow(cameraUuid) : undefined
+			const following =
+				follow?.status === 'following' && (!feedback.options.leader || follow.leaderId === feedback.options.leader)
+			switch (feedback.options.state) {
+				case 'following':
+					return following
+				case 'on_surface':
+					return following && follow?.onSurface !== false
+				case 'off_surface':
+					return following && follow?.onSurface === false
+				case 'idle':
+					return !following
+				default:
+					return false
+			}
+		},
+	}
+
+	feedbacks['control_unavailable'] = {
+		type: 'boolean',
+		name: 'Property: Not Available Now',
+		description:
+			'True while the camera does not take the control (for example knee level while knee is on Auto). The reason is in the log when a button tries it.',
+		defaultStyle: {
+			bgcolor: combineRgb(40, 40, 40),
+			color: combineRgb(120, 120, 120),
+		},
+		options: [
+			{
+				id: 'camera',
+				type: 'dropdown',
+				label: 'Camera',
+				choices: cameraChoices,
+				default: cameraChoices[0]?.id || '',
+			},
+			{
+				id: 'property',
+				type: 'dropdown',
+				label: 'Property',
+				choices: self.propertyChoices,
+				default: self.propertyChoices[0]?.id || '',
+			},
+		],
+		callback: (feedback) => {
+			const control = self.control(feedback.options.camera as string, feedback.options.property as string)
+			return control?.unavailable !== undefined
+		},
+	}
+
 	feedbacks['connected'] = {
 		type: 'boolean',
 		name: 'Connected to Server',

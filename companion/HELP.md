@@ -26,14 +26,30 @@ actions in Tracing mode. _Store_ starts recording the camera's path into the pre
 second _Store_ saves it; store on several cameras with one button to record them together,
 so they play back in step. _Recall_ plays the path from its start (a repeated recall
 starts it again, it never stops it). The camera's **Tracing speed** control sets the pace
-(1 = as recorded, 0 holds the head): put a _Float: Adjust Property_ for each camera on one
-rotary encoder to drive a group, or set it to 0 before the recall so every camera waits at
-its start. **Tracing: Stop** ends a playback; recalling a normal PTZ preset ends it too. The
+(1 = as recorded, 0 holds the head). **Tracing: Speed (Several Cameras)** sets one speed on
+every chosen camera in one pass, so cameras recorded together stay in step: put its _Up_ and
+_Down_ modes on a rotary encoder for a speed lever, or _Set_ 0 before the recall so every
+camera waits at its start. **Tracing: Stop** ends a playback; recalling a normal PTZ preset ends it too. The
 **Tracing: Camera State** feedback and the `camera_N_tracing_status`, `_preset`,
 `_progress` and `_remaining` variables show what each camera does. Camera readback is separate
 from command admission; accepting a command does not prove that hardware completed it.
 
+**Follow** (3D Tracing, RCP with Follow in the integration API): **Follow: Start** points a
+camera where a leader camera's centre of picture meets a surface of the site (its surface ID
+from the RCP's 3D Tracing page), or the level ground at a height. Zoom can stay with the
+operator, keep a frame width in metres at the target, or match the leader's picture. Start it
+again to change it; **Follow: Stop**, or any other move of the follower, ends it. Both
+cameras need a position on the site. The **Follow: Camera State** feedback and the
+`camera_N_follow_status` and `_follow_leader` variables show it.
+
 Preset numbers are the ones the RCP shows: Preset 1 on a camera is preset 1 here (up to 999).
+
+Values follow the camera's own definition. A control the camera reports shows a dash until
+it has reported. A control with named steps (gain in dB, shutter speeds) shows the step's
+name on its gauge and in a `camera_N_<control>_text` variable; the plain variable keeps the
+number. When the camera does not take a control now (knee level while knee is on Auto), a
+press is refused with the camera's reason in the log, and the **Property: Not Available Now**
+feedback can grey the button.
 
 Existing action and feedback IDs are retained. Presets are Companion 5 layered buttons,
 arranged in sections per camera, user and router with a group per control family.

@@ -9,16 +9,67 @@ export interface Control {
 	id: string
 	name?: string
 	type: string
+	group?: string
 	min?: number
 	max?: number
 	step?: number
 	choices?: unknown[]
+	/** Named steps of a numeric control, ascending: the camera takes the step nearest a written value. */
+	steps?: { value: number; label: string }[]
+	enumType?: string
+	allowCustomValue?: boolean
+	unit?: string | null
+	/** `setup`: the control configures the device rather than the picture. */
+	class?: string
+	/** The device reports this control: until `actual` holds a value, the value is not known. */
+	readback?: boolean
+	/** Why the device does not take the control now; not writable while present. */
+	unavailable?: string
 	desired?: { behavior: string; value: unknown } | null
 	writable: boolean
 	behavior: string
 	resolvedCameraId: string | null
 	value: unknown
 	actual: { value: unknown; reportedAtMs: number } | null
+}
+
+/** The value to show: null while a control the device reports has not reported yet. */
+export function knownValue(control: Control): unknown {
+	return control.readback && !control.actual ? null : control.value
+}
+
+/** A control's number, from a plain number or an `{ index, value }` enum entry. */
+export function numberOf(raw: unknown): number | null {
+	const value = typeof raw === 'number' ? raw : raw && typeof raw === 'object' && 'value' in raw ? raw.value : null
+	return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+/** The label of the named step nearest a value, when the control has named steps. */
+export function stepLabel(control: Control, value: number): string | undefined {
+	let best: { value: number; label: string } | undefined
+	for (const step of control.steps ?? [])
+		if (!best || Math.abs(step.value - value) < Math.abs(best.value - value)) best = step
+	return best?.label
+}
+
+/**
+ * The value as an operator reads it: a named step's label, an enum entry's value, percent
+ * for 0–1 numbers, otherwise the number with its unit. Null while unknown.
+ */
+export function controlText(control: Control): string | null {
+	const raw = knownValue(control)
+	if (raw === null || raw === undefined) return null
+	if (typeof raw === 'boolean') return raw ? 'On' : 'Off'
+	if (typeof raw === 'object' && 'value' in raw) return String(raw.value)
+	const value = numberOf(raw)
+	if (value === null) return typeof raw === 'string' ? raw : null
+	const label = stepLabel(control, value)
+	if (label !== undefined) return label
+	const min = control.min ?? 0
+	const max = control.max ?? 1
+	if (min === 0 && max === 1) return `${Math.round(value * 100)}%`
+	const decimals = Number.isInteger(min) && Number.isInteger(max) && max - min >= 10 ? 0 : 2
+	return `${value.toFixed(decimals)}${control.unit ? ' ' + control.unit : ''}`
 }
 export interface Camera {
 	uuid: string
@@ -34,6 +85,18 @@ export interface Camera {
 	presets: { kind: string; number: number; name: string | null }[]
 	/** The camera's tracing (recorded PTZ path) activity; absent on older RCPs. */
 	tracing?: Tracing
+	/** 3D Tracing Follow: the camera points where a leader's centre of picture meets a surface. */
+	follow?: Follow
+}
+export type FollowZoom = { mode: 'frameWidth'; frameWidthM: number } | { mode: 'matchLeader' } | { mode: 'off' }
+export interface Follow {
+	status: 'idle' | 'following'
+	leaderId?: string
+	/** Null: the level ground at a height. */
+	surfaceId?: string | null
+	zoom?: FollowZoom
+	/** False while the leader looks past the surface and the last range is kept. */
+	onSurface?: boolean | null
 }
 export interface Tracing {
 	status: 'idle' | 'recording' | 'playing' | 'calibrating' | 'scanning'
