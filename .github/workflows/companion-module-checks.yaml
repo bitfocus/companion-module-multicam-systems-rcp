@@ -24,19 +24,20 @@ jobs:
       - run: yarn lint
       - run: yarn companion-module-check
       - run: yarn package
-      - name: Verify packaged API 2 entrypoint
+      - name: Verify packaged API 1.13 entrypoint
+        # The Companion 4 line starts through runEntrypoint on import, so the check reads the
+        # manifest and the bundle instead of importing it.
         run: |
           mkdir -p "$RUNNER_TEMP/companion-module"
           tar -xzf multicam-systems-rcp-*.tgz --strip-components=1 -C "$RUNNER_TEMP/companion-module"
           MODULE_PACKAGE="$RUNNER_TEMP/companion-module" node --input-type=module <<'JS'
-          import {readFileSync} from 'node:fs'
-          import {pathToFileURL} from 'node:url'
+          import {existsSync, readFileSync} from 'node:fs'
           import {resolve} from 'node:path'
           const root = process.env.MODULE_PACKAGE
           const manifest = JSON.parse(readFileSync(resolve(root, 'companion/manifest.json')))
-          if (!manifest.runtime.apiVersion.startsWith('2.')) throw Error('Expected Companion API 2 package')
-          const entry = await import(pathToFileURL(resolve(root, 'companion', manifest.runtime.entrypoint)))
-          if (typeof entry.default !== 'function') throw Error('Package does not export a module class')
+          if (!manifest.runtime.apiVersion.startsWith('1.13.')) throw Error('Expected Companion API 1.13 package')
+          const entry = resolve(root, 'companion', manifest.runtime.entrypoint)
+          if (!existsSync(entry) || !readFileSync(entry, 'utf8').includes('runEntrypoint')) throw Error('Package has no 1.x entrypoint')
           JS
       - uses: actions/upload-artifact@v4
         with:
