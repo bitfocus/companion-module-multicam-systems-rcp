@@ -1,8 +1,4 @@
-import type {
-	CompanionStaticUpgradeScript,
-	CompanionUpgradeContext,
-	CompanionStaticUpgradeProps,
-} from '@companion-module/base'
+import type { CompanionStaticUpgradeScript, CompanionUpgradeContext, CompanionStaticUpgradeProps } from './companion.js'
 import type { ModuleConfig, ModuleSecrets } from './config.js'
 
 /**

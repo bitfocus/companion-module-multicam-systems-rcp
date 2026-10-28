@@ -1,5 +1,5 @@
-import type { CompanionVariableDefinition, CompanionVariableValues } from '@companion-module/base'
-import type { ModuleInstance } from './main.js'
+import type { CompanionVariableDefinition, CompanionVariableValues } from './companion.js'
+import type { ModuleInstance } from './instance.js'
 import type { PropertyValue } from './types.js'
 import { controlText } from './api.js'
 
@@ -129,9 +129,7 @@ export function UpdateVariableDefinitions(self: ModuleInstance): void {
 	})
 
 	self.variableIds = variables.map((variable) => variable.variableId)
-	self.setVariableDefinitions(
-		Object.fromEntries(variables.map(({ variableId, ...definition }) => [variableId, definition])),
-	)
+	self.defineVariables(variables)
 
 	// Set initial values
 	UpdateVariableValues(self)

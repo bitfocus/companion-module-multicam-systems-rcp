@@ -177,9 +177,8 @@ test('cloud credentials are cached and requests retain the project/instance pref
 	await new Promise((resolve) => server.close(resolve))
 })
 
-test('controller presets select discovered choices at the current generation and show effective parent choices', async () => {
-	const { controllerActions, controllerFeedbacks, controllerPresets, controllerSelection } =
-		await import('./dist/controllers.js')
+test('controller choices select at the current generation and show effective parent choices', async () => {
+	const { controllerActions, controllerFeedbacks, controllerSelection } = await import('./dist/controllers.js')
 	const state = {
 		generation: 8,
 		switchers: [
@@ -205,12 +204,8 @@ test('controller presets select discovered choices at the current generation and
 		log: (_level, message) => warnings.push(message),
 	}
 	const actions = controllerActions(host),
-		feedbacks = controllerFeedbacks(host),
-		presets = controllerPresets(host)
-	assert.equal(Object.keys(presets).length, 2)
-	const preset = Object.values(presets).find((p) => p.name === 'Select Studio B')
-	assert.equal(preset.steps[0].down[0].actionId, 'controller_select')
-	await actions.controller_select.callback({ options: preset.steps[0].down[0].options })
+		feedbacks = controllerFeedbacks(host)
+	await actions.controller_select.callback({ options: { choice: key } })
 	assert.deepEqual(sent[0], { type: 'controllerSelect', switcherId: 'operator', choiceId: 'b', expectedGeneration: 8 })
 	assert.equal(feedbacks.controller_selected.callback({ options: { choice: key } }), true)
 	assert.equal(
@@ -231,7 +226,7 @@ test('controller presets select discovered choices at the current generation and
 })
 
 test('preset commands carry the current controller generation and fail closed without it', async () => {
-	const { ModuleInstance } = await import('./dist/main.js')
+	const { ModuleInstance } = await import('./dist/instance.js')
 	const sent = [],
 		warnings = []
 	const host = {

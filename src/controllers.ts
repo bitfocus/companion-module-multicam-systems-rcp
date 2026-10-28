@@ -1,9 +1,8 @@
-import { combineRgb, type CompanionActionDefinitions, type CompanionFeedbackDefinitions } from '@companion-module/base'
-import type { ModuleInstance } from './main.js'
+import { combineRgb, type CompanionActionDefinitions, type CompanionFeedbackDefinitions } from './companion.js'
+import type { ModuleInstance } from './instance.js'
 import type { ControllerState } from './api.js'
-import { pillTile, tone, type Layered } from './design.js'
 
-type Host = Pick<ModuleInstance, 'connected' | 'controllerSwitchers' | 'command' | 'log'>
+export type Host = Pick<ModuleInstance, 'connected' | 'controllerSwitchers' | 'command' | 'log'>
 
 export function controllerSelection(
 	state: ControllerState | undefined,
@@ -80,25 +79,4 @@ export function controllerFeedbacks(self: Host): CompanionFeedbackDefinitions {
 			},
 		},
 	}
-}
-
-export function controllerPresets(self: Host): Record<string, Layered & { category: string }> {
-	const presets: Record<string, Layered & { category: string }> = {}
-	for (const switcher of self.controllerSwitchers?.switchers ?? []) {
-		for (const choice of switcher.choices) {
-			const key = JSON.stringify([switcher.id, choice.id])
-			presets[`controller_${Buffer.from(key).toString('base64url')}`] = {
-				...pillTile({
-					name: `Select ${choice.name}`,
-					label: choice.name,
-					caption: switcher.name,
-					accent: tone('controller'),
-					active: { feedbackId: 'controller_selected', options: { choice: key } },
-					steps: [{ down: [{ actionId: 'controller_select', options: { choice: key } }], up: [] }],
-				}),
-				category: `Controller choices: ${switcher.name}`,
-			}
-		}
-	}
-	return presets
 }

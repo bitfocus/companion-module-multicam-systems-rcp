@@ -18,8 +18,19 @@ import {
 	ButtonGraphicsDecorationType,
 	ButtonGraphicsShowStatusIcons,
 } from '@companion-module/base'
-import type { ModuleTypes } from './main.js'
-import type { Presentation } from './api.js'
+import type { ModuleTypes } from '../companion.js'
+import { INK, TALLY, currentPresentation } from '../palette.js'
+
+export {
+	INK,
+	TALLY,
+	ACCENT,
+	DEFAULT_PRESENTATION,
+	applyPresentation,
+	currentPresentation,
+	tone,
+	channelAccent,
+} from '../palette.js'
 
 export type Layered = CompanionLayeredButtonPresetDefinition<ModuleTypes>
 type Feedbacks = Layered['feedbacks']
@@ -41,85 +52,10 @@ type Expr = { isExpression: true; value: string }
 
 export const expr = (value: string): Expr => ({ isExpression: true, value })
 
-/** Palette: neutral surfaces, one accent per property group, tally colours. */
-export const INK = {
-	bg: 0x14181d,
-	panel: 0x1f252d,
-	track: 0x2c3440,
-	text: 0xf3f4f6,
-	muted: 0x9aa4b2,
-	dim: 0x5b6472,
-	white: 0xffffff,
-	black: 0x000000,
-	/** Companion packs transparency in the top byte: 0xff = fully transparent. */
-	clear: 0xff000000,
-	shade: 0x60000000,
-}
-export const TALLY = {
-	red: 0xe11d2e,
-	green: 0x22c55e,
-	blue: 0x3b82f6,
-	yellow: 0xfacc15,
-	purple: 0xa855f7,
-	off: 0x2c3440,
-}
-export const ACCENT: Record<string, number> = {
-	lens: 0x38bdf8,
-	color: 0xf472b6,
-	ptz: 0x34d399,
-	sensor: 0xfbbf24,
-	monitor: 0xa78bfa,
-	audio: 0x22d3ee,
-	system: 0x9ca3af,
-	record: 0xf87171,
-	matrix: 0xc084fc,
-	user: 0x60a5fa,
-	route: 0xf59e0b,
-	controller: 0x2dd4bf,
-}
-export const DEFAULT_PRESENTATION: Presentation = {
-	version: 1,
-	theme: 'rings',
-	accent: 'group',
-	accentColor: '#38bdf8',
-	topBar: false,
-	textScale: 1,
-	hiddenCameras: [],
-	hiddenModules: [],
-}
-let presentation: Presentation = DEFAULT_PRESENTATION
-/** Apply the RCP's Companion presentation settings before building presets. */
-export function applyPresentation(next?: Partial<Presentation> | null): Presentation {
-	presentation = { ...DEFAULT_PRESENTATION, ...(next ?? {}) }
-	return presentation
-}
-export function currentPresentation(): Presentation {
-	return presentation
-}
-function parseHex(color: string, fallback: number): number {
-	const match = /^#?([0-9a-f]{6})$/i.exec(color.trim())
-	return match ? parseInt(match[1], 16) : fallback
-}
-/** The accent for a control group under the current accent mode. */
-export function tone(group: string): number {
-	if (presentation.accent === 'single') return parseHex(presentation.accentColor, ACCENT.lens)
-	if (presentation.accent === 'mono') return 0x9aa4b2
-	return ACCENT[group] ?? ACCENT.system
-}
-/** Colour-grading channels keep their own hue whatever group they sit in. */
-export function channelAccent(property: string, group: string): number {
-	if (presentation.accent !== 'group') return tone(group)
-	const p = property.toLowerCase()
-	if (/(^|_)(red|r)_(gain|lift|gamma|pedestal|phase|saturation)/.test(p)) return 0xef4444
-	if (/(^|_)(green|g)_(gain|lift|gamma|pedestal|phase|saturation)/.test(p)) return 0x22c55e
-	if (/(^|_)(blue|b)_(gain|lift|gamma|pedestal|phase|saturation)/.test(p)) return 0x3b82f6
-	return tone(group)
-}
-
 /** Designed tiles own the whole face unless the RCP asks for Companion's top bar. */
 function canvas() {
 	return {
-		decoration: presentation.topBar ? ButtonGraphicsDecorationType.TopBar : ButtonGraphicsDecorationType.None,
+		decoration: currentPresentation().topBar ? ButtonGraphicsDecorationType.TopBar : ButtonGraphicsDecorationType.None,
 		showStatusIcons: ButtonGraphicsShowStatusIcons.FollowDefault,
 	}
 }
@@ -132,7 +68,9 @@ function canvas() {
 function text(
 	partial: Omit<ButtonGraphicsTextElement, 'type'> & { height: number; fontsize: number },
 ): ButtonGraphicsTextElement {
-	const scale = Number.isFinite(presentation.textScale) ? Math.min(1.6, Math.max(0.7, presentation.textScale)) : 1
+	const scale = Number.isFinite(currentPresentation().textScale)
+		? Math.min(1.6, Math.max(0.7, currentPresentation().textScale))
+		: 1
 	// The RCP's text scale is for the property text (labels, captions, hints), not the value.
 	// Companion sizes text by its box, so the box grows around its centre with the scale.
 	const scaled = ['label', 'caption', 'subtitle', 'step', 'waiting'].includes(partial.id ?? '')
@@ -330,7 +268,7 @@ function levelTile(t: TileBase & { label: string; source: ValueSource }, stripe:
 	const value = valueText(source.local, source.min, source.max, source.unit, source.labelLocal)
 	const base: SomeButtonGraphicsElement[] = stripe ? surface(t.accent) : [box('bg', 0, 0, 100, 100, INK.bg)]
 	const elements: SomeButtonGraphicsElement[] =
-		presentation.theme === 'rings'
+		currentPresentation().theme === 'rings'
 			? [
 					...base,
 					text({ id: 'label', text: t.label, x: 6, y: 3, width: 88, height: 18, fontsize: 11, color: INK.muted }),
@@ -341,7 +279,7 @@ function levelTile(t: TileBase & { label: string; source: ValueSource }, stripe:
 					...base,
 					text({ id: 'label', text: t.label, x: 8, y: 4, width: 90, height: 26, fontsize: 11, color: INK.muted }),
 					text({ id: 'value', text: value, x: 8, y: 30, width: 90, height: 40, fontsize: 24, weight: 'bold' }),
-					...(presentation.theme === 'bars'
+					...(currentPresentation().theme === 'bars'
 						? [bar('bar', source.local, source.min, source.max, t.accent, 82, 10)]
 						: []),
 				]
@@ -410,7 +348,7 @@ export function stepTile(
 			}),
 		)
 	}
-	if (t.source && presentation.theme !== 'plain')
+	if (t.source && currentPresentation().theme !== 'plain')
 		elements.push(bar('bar', t.source.local, t.source.min, t.source.max, t.accent, 86, 8))
 	return {
 		type: 'layered',
@@ -736,7 +674,7 @@ export function slotTile(t: TileBase & { localVariables: LocalVariables }): Laye
 			stops: [{ value: 0, color: accent, gradient: false }],
 		}) as ButtonGraphicsGaugeElement
 	const elements: SomeButtonGraphicsElement[] =
-		presentation.theme === 'rings'
+		currentPresentation().theme === 'rings'
 			? [
 					box('bg', 0, 0, 100, 100, INK.bg),
 					text({
@@ -785,7 +723,7 @@ export function slotTile(t: TileBase & { localVariables: LocalVariables }): Laye
 						fontsize: 24,
 						weight: 'bold',
 					}),
-					...(presentation.theme === 'bars' ? [gauge('horizontal', 12, 72, 82, 10)] : []),
+					...(currentPresentation().theme === 'bars' ? [gauge('horizontal', 12, 72, 82, 10)] : []),
 					text({ id: 'step', text: '$(local:step)', x: 8, y: 86, width: 90, height: 12, fontsize: 8, color: INK.dim }),
 				]
 	return {

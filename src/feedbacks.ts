@@ -1,8 +1,8 @@
 import { controllerFeedbacks } from './controllers.js'
 import { deckFeedbacks } from './deck.js'
 import { graphicsFeedbacks } from './graphics.js'
-import { combineRgb, type CompanionFeedbackDefinitions } from '@companion-module/base'
-import type { ModuleInstance } from './main.js'
+import { combineRgb, type CompanionFeedbackDefinitions } from './companion.js'
+import type { ModuleInstance } from './instance.js'
 import type { PropertyValue } from './types.js'
 
 /**
