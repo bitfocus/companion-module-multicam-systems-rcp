@@ -234,16 +234,17 @@ export function UpdatePresets(self: ModuleInstance): void {
 				},
 			],
 		})
-		presets[`cam_${camId}_tracing_speed`] = button({
-			category,
-			name: 'Tracing speed · rotary',
-			text: `SPEED\\n${variable(`camera_${camNum}_tracing_speed`)}x`,
-			down: [{ actionId: 'tracing_speed', options: { cameras: [cameraUuid], mode: 'set', speed: 1, step: 0.1 } }],
-			rotate: {
-				left: [{ actionId: 'tracing_speed', options: { cameras: [cameraUuid], mode: 'down', speed: 1, step: 0.1 } }],
-				right: [{ actionId: 'tracing_speed', options: { cameras: [cameraUuid], mode: 'up', speed: 1, step: 0.1 } }],
-			},
-		})
+		if (self.control(cameraUuid, 'tracing_speed'))
+			presets[`cam_${camId}_tracing_speed`] = button({
+				category,
+				name: 'Tracing speed · rotary',
+				text: `SPEED\\n${variable(`camera_${camNum}_tracing_speed`)}x`,
+				down: [{ actionId: 'tracing_speed', options: { cameras: [cameraUuid], mode: 'set', speed: 1, step: 0.1 } }],
+				rotate: {
+					left: [{ actionId: 'tracing_speed', options: { cameras: [cameraUuid], mode: 'down', speed: 1, step: 0.1 } }],
+					right: [{ actionId: 'tracing_speed', options: { cameras: [cameraUuid], mode: 'up', speed: 1, step: 0.1 } }],
+				},
+			})
 		presets[`cam_${camId}_follow`] = button({
 			category,
 			name: 'Follow status · stop',
@@ -270,12 +271,13 @@ export function UpdatePresets(self: ModuleInstance): void {
 	}
 
 	// One speed lever for every visible camera: cameras recorded together stay in step.
-	if (visibleCameras.length > 1) {
-		const cameras = visibleCameras.map(({ camera }) => camera.uuid)
+	const tracing = visibleCameras.filter(({ camera }) => self.control(camera.uuid, 'tracing_speed'))
+	if (tracing.length > 1) {
+		const cameras = tracing.map(({ camera }) => camera.uuid)
 		presets.tracing_speed_all = button({
 			category: 'Tracing',
 			name: 'Speed lever · all cameras',
-			text: `SPEED\\nALL\\n${variable(`camera_${visibleCameras[0].camNum}_tracing_speed`)}x`,
+			text: `SPEED\\nALL\\n${variable(`camera_${tracing[0].camNum}_tracing_speed`)}x`,
 			down: [{ actionId: 'tracing_speed', options: { cameras, mode: 'set', speed: 1, step: 0.1 } }],
 			rotate: {
 				left: [{ actionId: 'tracing_speed', options: { cameras, mode: 'down', speed: 1, step: 0.1 } }],
