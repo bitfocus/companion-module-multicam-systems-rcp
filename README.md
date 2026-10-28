@@ -7,6 +7,22 @@ Socket.IO interface.
 
 See [configuration and limits](companion/HELP.md) and [LICENSE](LICENSE).
 
+## Release lines
+
+Two lines share one core and are published side by side; Companion installs the newest
+version it can run.
+
+| Branch        | Version | Module API | Companion     | Presets                                   |
+| ------------- | ------- | ---------- | ------------- | ----------------------------------------- |
+| `main`        | 2.x     | 2.1        | 5.1 and later | layered tiles, gauges, Stream Deck + page |
+| `companion-4` | 1.x     | 1.13       | 4.1 and later | classic buttons                           |
+
+Files directly in `src/` and `test-api.mjs` are the shared core and stay identical on both
+branches. Each line owns `src/companion.ts` (the module API adapter the core imports
+Companion's types from), `src/main.ts` (the entry), `src/presets/`, `test-presets.mjs`,
+`package.json` and `companion/`. Change the core on one branch, then copy it across with
+`tools/sync-core.sh <other checkout>`, build and test there, and commit on both.
+
 ## Development
 
 Use Node 22.20+ or 26.5+ and the pinned Yarn version.

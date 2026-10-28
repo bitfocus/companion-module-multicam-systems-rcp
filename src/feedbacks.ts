@@ -1,6 +1,7 @@
 import { controllerFeedbacks } from './controllers.js'
 import { deckFeedbacks } from './deck.js'
 import { graphicsFeedbacks } from './graphics.js'
+import { lineFeedbacks } from './presets/index.js'
 import { combineRgb, type CompanionFeedbackDefinitions } from './companion.js'
 import type { ModuleInstance } from './instance.js'
 import type { PropertyValue } from './types.js'
@@ -1224,5 +1225,6 @@ export function UpdateFeedbacks(self: ModuleInstance): void {
 		...graphicsFeedbacks(self),
 		...controllerFeedbacks(self),
 		...deckFeedbacks(self),
+		...lineFeedbacks(self),
 	})
 }

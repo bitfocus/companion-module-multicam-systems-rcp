@@ -44,7 +44,8 @@ export class ModuleInstance extends ModuleBase {
 	videoSources: VideoSource[] = []
 	images = new ImageFeeds(
 		() => (this.connected && this.config.connection !== 'cloud' ? this.api : null),
-		() => this.checkFeedbacks('live_image'),
+		// live_image feeds the layered tiles, live_image_button a classic button (Companion 4).
+		() => this.checkFeedbacks('live_image', 'live_image_button'),
 	)
 	reconnect_timer: NodeJS.Timeout | null = null
 	isInitialized = false
@@ -246,7 +247,7 @@ export class ModuleInstance extends ModuleBase {
 		this.api = null
 		this.connected = false
 		this.images.disconnect()
-		this.setVariableValues(Object.fromEntries(this.variableIds.map((id) => [id, null])))
+		this.setVariableValues(Object.fromEntries(this.variableIds.map((id) => [id, undefined])))
 		this.propertyValues.clear()
 		this.apiCameras = []
 		this.controllerSwitchers = undefined

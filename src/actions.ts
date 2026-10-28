@@ -1,13 +1,11 @@
 import { controllerActions } from './controllers.js'
 import { deckActions } from './deck.js'
-import type { CompanionActionDefinitions } from './companion.js'
+import type { ActionDefinitions } from './companion.js'
 import type { ModuleInstance } from './instance.js'
 import type { FollowZoom } from './api.js'
 
 export function UpdateActions(self: ModuleInstance): void {
-	const actions: CompanionActionDefinitions<
-		Record<string, { options: import('@companion-module/base').CompanionOptionValues }>
-	> = {}
+	const actions: ActionDefinitions = {}
 
 	// Get current choices
 	const cameraChoices = self.cameraChoices.length > 0 ? self.cameraChoices : [{ id: '', label: 'No cameras available' }]

@@ -6,7 +6,13 @@
  * @companion-module/base. That line's companion.ts maps the same names onto module API 1.13.
  * Only this file, main.ts and src/presets/ differ between the lines.
  */
-import { InstanceBase, type CompanionVariableDefinition, type InstanceTypes } from '@companion-module/base'
+import {
+	InstanceBase,
+	type CompanionActionDefinitions,
+	type CompanionOptionValues,
+	type CompanionVariableDefinition,
+	type InstanceTypes,
+} from '@companion-module/base'
 import type { ModuleConfig, ModuleSecrets } from './config.js'
 
 export { InstanceStatus, combineRgb } from '@companion-module/base'
@@ -21,6 +27,9 @@ export type {
 	DropdownChoice,
 	SomeCompanionConfigField,
 } from '@companion-module/base'
+
+/** The action table UpdateActions builds: options as Companion hands them over. */
+export type ActionDefinitions = CompanionActionDefinitions<Record<string, { options: CompanionOptionValues }>>
 
 export type ModuleTypes = InstanceTypes & { config: ModuleConfig; secrets: ModuleSecrets }
 
