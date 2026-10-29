@@ -46,7 +46,7 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			label: 'Integration API token',
 			width: 12,
 			tooltip:
-				'Optional for a local RCP on this machine unless token enforcement is switched on there. Otherwise create a project-scoped token with monitor, control, routing and images access.',
+				'Leave empty when RCP runs on this computer. Otherwise create one in RCP under Production Toolbox → Companion → Access, on the computer that runs RCP.',
 		},
 		{ type: 'checkbox', id: 'tls', label: 'Use HTTPS / WSS', width: 6, default: false },
 		{
