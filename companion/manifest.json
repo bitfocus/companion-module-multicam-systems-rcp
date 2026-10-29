@@ -23,5 +23,11 @@
 	"manufacturer": "Multicam Systems",
 	"products": ["RCP"],
 	"keywords": ["camera", "broadcast", "ptz", "tally", "rcp", "control"],
-	"type": "connection"
+	"type": "connection",
+	"bonjourQueries": {
+		"bonjourHost": {
+			"type": "multicam-rcp",
+			"protocol": "tcp"
+		}
+	}
 }

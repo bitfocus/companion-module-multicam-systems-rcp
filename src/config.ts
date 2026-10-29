@@ -9,6 +9,8 @@ export type ModuleConfig = {
 	cloudProjectId?: string
 	cloudInstanceId?: string
 	tls?: boolean
+	/** A discovered RCP as `ip:port`, or null/undefined for Manual (host and port). */
+	bonjourHost?: string | null
 	host: string
 	port: number
 	reconnect: boolean
@@ -48,7 +50,14 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			tooltip:
 				'Leave empty when RCP runs on this computer. Otherwise create one in RCP under Production Toolbox → Companion → Access, on the computer that runs RCP.',
 		},
-		{ type: 'checkbox', id: 'tls', label: 'Use HTTPS / WSS', width: 6, default: false },
+		{
+			type: 'checkbox',
+			id: 'tls',
+			label: 'Use HTTPS / WSS',
+			width: 6,
+			isVisibleExpression: `!$(options:bonjourHost)`,
+			default: false,
+		},
 		{
 			type: 'static-text',
 			id: 'info',
@@ -58,11 +67,21 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 				'<strong>Multicam RCP</strong> - Remote Control Panel for broadcast camera control. Configure the connection to your Multicam RCP server below.',
 		},
 		{
+			type: 'bonjour-device',
+			id: 'bonjourHost',
+			label: 'Multicam RCP on this network',
+			tooltip:
+				'RCP servers announcing themselves on the local network. Choose Manual to type the address, or to use HTTPS.',
+			width: 12,
+			isVisibleExpression: `$(options:connection) != 'cloud'`,
+		},
+		{
 			type: 'textinput',
 			id: 'host',
 			label: 'Target IP',
 			tooltip: 'The IP address of the Multicam RCP server',
 			width: 6,
+			isVisibleExpression: `!$(options:bonjourHost)`,
 			default: '127.0.0.1',
 		},
 		{
@@ -71,6 +90,7 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			label: 'Port',
 			tooltip: 'The port of the Multicam RCP server (default: 5994)',
 			width: 6,
+			isVisibleExpression: `!$(options:bonjourHost)`,
 			min: 1,
 			max: 65535,
 			default: 5994,
@@ -92,4 +112,21 @@ export function GetConfigFields(): SomeCompanionConfigField[] {
 			default: false,
 		},
 	]
+}
+
+/**
+ * The local RCP's base URL. A discovered RCP announces its HTTP port (`_multicam-rcp._tcp`),
+ * so it is reached over HTTP there; Manual uses the typed host, port and HTTPS choice.
+ */
+export function localUrl(config: Pick<ModuleConfig, 'bonjourHost' | 'host' | 'port' | 'tls'>): string {
+	const discovered = config.bonjourHost?.trim()
+	if (discovered) {
+		const colon = discovered.lastIndexOf(':')
+		const host = discovered.slice(0, colon)
+		const port = Number(discovered.slice(colon + 1))
+		if (colon > 0 && Number.isInteger(port) && port > 0 && port < 65536) return `http://${host}:${port}`
+		throw Error(`Discovered address ${discovered} is not host:port`)
+	}
+	if (!config.host || !config.port) throw Error('Host and port are required')
+	return `${config.tls ? 'https' : 'http'}://${config.host}:${config.port}`
 }

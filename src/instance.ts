@@ -1,6 +1,6 @@
 import { cloudConnection } from './cloud.js'
 import { ModuleBase, InstanceStatus, type SomeCompanionConfigField, type DropdownChoice } from './companion.js'
-import { type ModuleConfig, type ModuleSecrets, GetConfigFields } from './config.js'
+import { type ModuleConfig, type ModuleSecrets, GetConfigFields, localUrl } from './config.js'
 import { UpdateVariableDefinitions, UpdateVariableValues } from './variables.js'
 import { UpdateActions } from './actions.js'
 import { UpdateFeedbacks } from './feedbacks.js'
@@ -273,8 +273,7 @@ export class ModuleInstance extends ModuleBase {
 			} else {
 				// A local RCP accepts callers on its own machine without a token unless
 				// token enforcement was switched on there; the token is optional here.
-				if (!this.config.host || !this.config.port) throw Error('Host and port are required')
-				url = `${this.config.tls ? 'https' : 'http'}://${this.config.host}:${this.config.port}`
+				url = localUrl(this.config)
 				token = this.secrets.token ?? ''
 			}
 		} catch (error) {
