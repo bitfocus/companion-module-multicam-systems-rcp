@@ -6,9 +6,10 @@ This version is for **Companion 4.1 and later** and needs an RCP build exposing 
 `1.0-preview`. On Companion 5.1 and later, use version 2 of this module: it adds gauges,
 layered tiles and a Stream Deck + page.
 
-- **Target IP / Port:** your RCP server, default `127.0.0.1:5994`. Existing saved ports are preserved.
+- **Multicam RCP on this network:** RCP servers announcing themselves on the local network (Bonjour). Pick one, or **Manual** to type the address. A discovered server is reached over HTTP at the port it announces.
+- **Target IP / Port:** with Manual, your RCP server, default `127.0.0.1:5994`. Existing saved ports are preserved.
 - **Integration API token:** leave empty when Companion runs on the same computer as RCP. For Companion on another computer, create a token in RCP under **Production Toolbox → Companion → Access**, on the computer that runs RCP, and paste it here. Tick all four access options for every feature. Companion stores it as a secret.
-- **Use HTTPS / WSS:** enable for a server providing HTTPS; use that server's HTTPS port.
+- **Use HTTPS / WSS:** with Manual, enable for a server providing HTTPS; use that server's HTTPS port.
 - **Auto Reconnect:** retry after five seconds when disconnected.
 
 Tokens expire and can be revoked. Changing the active RCP project requires a token

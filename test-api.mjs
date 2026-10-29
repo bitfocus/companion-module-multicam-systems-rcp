@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import { WebSocketServer } from 'ws'
 import { IntegrationApi, ImageFeeds, reduceState, controlText, knownValue, stepLabel } from './dist/api.js'
+import { GetConfigFields, localUrl } from './dist/config.js'
 
 async function until(predicate, timeout = 3000) {
 	const deadline = Date.now() + timeout
@@ -279,4 +280,21 @@ test('control text follows the camera definition: unknown readback, named steps,
 	)
 	assert.equal(controlText({ ...base, type: 'enum', value: { index: 3, value: 'Auto' }, actual: null }), 'Auto')
 	assert.equal(controlText({ ...base, type: 'boolean', value: true, actual: null }), 'On')
+})
+
+test('a discovered RCP is reached at its announced address, Manual at the typed one', () => {
+	const manual = { host: '10.0.0.5', port: 5994, tls: true }
+	assert.equal(localUrl({ ...manual, bonjourHost: '192.168.0.103:5995' }), 'http://192.168.0.103:5995')
+	assert.equal(localUrl({ ...manual, bonjourHost: null }), 'https://10.0.0.5:5994')
+	assert.equal(localUrl({ ...manual, tls: false }), 'http://10.0.0.5:5994')
+	assert.throws(() => localUrl({ ...manual, bonjourHost: '192.168.0.103' }), /not host:port/)
+	assert.throws(() => localUrl({ host: '', port: 5994 }), /Host and port are required/)
+
+	const fields = GetConfigFields()
+	const ids = fields.map((field) => field.id)
+	assert.equal(fields.find((field) => field.id === 'bonjourHost')?.type, 'bonjour-device')
+	assert.ok(ids.indexOf('bonjourHost') < ids.indexOf('host'), 'the picker comes before the manual address')
+	for (const id of ['host', 'port', 'tls']) {
+		assert.equal(fields.find((field) => field.id === id)?.isVisibleExpression, '!$(options:bonjourHost)')
+	}
 })
