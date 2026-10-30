@@ -1,9 +1,11 @@
 node_modules/
 package-lock.json
 /pkg
-/pkg.tgz
+/*.tgz
 /dist
 DEBUG-*
+/.yarn
+/.vscode
 
 # Packaged module artifacts
 *.tgz

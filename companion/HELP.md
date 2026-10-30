@@ -2,8 +2,8 @@
 
 ## Connect
 
-This version is for **Companion 4.1 and later** and needs an RCP build exposing API
-`1.0-preview`. On Companion 5.1 and later, use version 2 of this module: it adds gauges,
+This beta is for **Companion 4.1 and later** and needs Multicam RCP beta 261028 or newer
+(integration API `1.0-preview`). The token screen in RCP comes in the beta after 261028. On Companion 5.1 and later, use version 2 of this module: it adds gauges,
 layered tiles and a Stream Deck + page.
 
 - **Multicam RCP on this network:** RCP servers announcing themselves on the local network (Bonjour). Pick one, or **Manual** to type the address. A discovered server is reached over HTTP at the port it announces.
