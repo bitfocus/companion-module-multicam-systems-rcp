@@ -2,7 +2,7 @@
 
 ## Connect
 
-This beta requires Companion 5 and an RCP build exposing API `1.0-preview`.
+This beta needs Companion 5.1 or later and Multicam RCP beta 261028 or newer (integration API `1.0-preview`). The token screen in RCP comes in the beta after 261028.
 
 - **Multicam RCP on this network:** RCP servers announcing themselves on the local network (Bonjour). Pick one, or **Manual** to type the address. A discovered server is reached over HTTP at the port it announces.
 - **Target IP / Port:** with Manual, your RCP server, default `127.0.0.1:5994`. Existing saved ports are preserved.

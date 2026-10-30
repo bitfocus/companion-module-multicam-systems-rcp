@@ -1,6 +1,6 @@
 {
-	"name": "companion-module-multicam-systems-rcp",
-	"version": "2.0.0-beta.4",
+	"name": "multicam-systems-rcp",
+	"version": "2.0.0-beta.5",
 	"main": "dist/main.js",
 	"type": "module",
 	"scripts": {
@@ -21,7 +21,8 @@
 		"url": "git+https://github.com/bitfocus/companion-module-multicam-systems-rcp.git"
 	},
 	"engines": {
-		"node": "^22.20 || ^26.5"
+		"node": "^22.20 || ^26.5",
+		"yarn": "^4"
 	},
 	"dependencies": {
 		"@companion-module/base": "~2.1.3",
