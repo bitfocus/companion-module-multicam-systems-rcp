@@ -232,6 +232,7 @@ export function UpdateActions(self: ModuleInstance): void {
 			},
 			{
 				id: 'step_size',
+				disableAutoExpression: true,
 				type: 'dropdown',
 				label: 'Step Size',
 				choices: [
@@ -246,6 +247,7 @@ export function UpdateActions(self: ModuleInstance): void {
 				id: 'user',
 				type: 'dropdown',
 				label: 'User (for user setting)',
+				isVisibleExpression: "$(options:step_size) == 'user_setting'",
 				choices: userChoices,
 				default: userChoices[0]?.id || '',
 			},
@@ -291,6 +293,7 @@ export function UpdateActions(self: ModuleInstance): void {
 			},
 			{
 				id: 'step_size',
+				disableAutoExpression: true,
 				type: 'dropdown',
 				label: 'Step Size',
 				choices: [
@@ -305,6 +308,7 @@ export function UpdateActions(self: ModuleInstance): void {
 				id: 'user',
 				type: 'dropdown',
 				label: 'User (for user setting)',
+				isVisibleExpression: "$(options:step_size) == 'user_setting'",
 				choices: userChoices,
 				default: userChoices[0]?.id || '',
 			},
@@ -461,6 +465,7 @@ export function UpdateActions(self: ModuleInstance): void {
 			},
 			{
 				id: 'mode',
+				disableAutoExpression: true,
 				type: 'dropdown',
 				label: 'Mode',
 				choices: [
@@ -475,6 +480,7 @@ export function UpdateActions(self: ModuleInstance): void {
 				id: 'user',
 				type: 'dropdown',
 				label: 'User (for user setting)',
+				isVisibleExpression: "$(options:mode) == 'user_setting'",
 				choices: userChoices,
 				default: userChoices[0]?.id || '',
 			},
@@ -521,6 +527,7 @@ export function UpdateActions(self: ModuleInstance): void {
 			},
 			{
 				id: 'mode',
+				disableAutoExpression: true,
 				type: 'dropdown',
 				label: 'Mode',
 				choices: [
@@ -535,6 +542,7 @@ export function UpdateActions(self: ModuleInstance): void {
 				id: 'user',
 				type: 'dropdown',
 				label: 'User (for user setting)',
+				isVisibleExpression: "$(options:mode) == 'user_setting'",
 				choices: userChoices,
 				default: userChoices[0]?.id || '',
 			},
@@ -582,6 +590,7 @@ export function UpdateActions(self: ModuleInstance): void {
 			},
 			{
 				id: 'action',
+				disableAutoExpression: true,
 				type: 'dropdown',
 				label: 'Action',
 				choices: [
@@ -593,6 +602,7 @@ export function UpdateActions(self: ModuleInstance): void {
 			},
 			{
 				id: 'mode',
+				disableAutoExpression: true,
 				type: 'dropdown',
 				label: 'Mode',
 				choices: [
@@ -607,6 +617,7 @@ export function UpdateActions(self: ModuleInstance): void {
 				id: 'user',
 				type: 'dropdown',
 				label: 'User (for user settings)',
+				isVisibleExpression: "$(options:action) == 'user_setting' || $(options:mode) == 'user_setting'",
 				choices: userChoices,
 				default: userChoices[0]?.id || '',
 			},
@@ -872,6 +883,63 @@ export function UpdateActions(self: ModuleInstance): void {
 	// ===================
 
 	Object.assign(actions, controllerActions(self), deckActions(self))
+
+	// The 1.0 user actions, kept so buttons made with 1.0 keep working. They now go through
+	// the user's controller switcher; Controller: Select Choice is the general form.
+	const physicalCameraChoices = cameraChoices.filter(
+		(choice) => !self.cameras.find((camera) => camera.uuid === choice.id)?.virtualCameraEnable,
+	)
+	actions['select_user_preview'] = {
+		name: 'User: Select Camera',
+		description:
+			"Put a camera on a user's controller switcher (the switcher's choice for that camera). Controller: Select Choice does the same for any switcher.",
+		options: [
+			{
+				id: 'user',
+				type: 'dropdown',
+				label: 'User',
+				choices: userChoices,
+				default: userChoices[0]?.id || '',
+			},
+			{
+				id: 'camera',
+				type: 'dropdown',
+				label: 'Camera',
+				choices: physicalCameraChoices.length ? physicalCameraChoices : cameraChoices,
+				default: (physicalCameraChoices[0] ?? cameraChoices[0])?.id || '',
+			},
+		],
+		callback: async (action) => {
+			const userUuid = action.options.user as string
+			const cameraUuid = action.options.camera as string
+			if (!userUuid || !cameraUuid) {
+				self.log('warn', 'User: Select Camera needs a user and a camera')
+				return
+			}
+			self.selectUserCamera(userUuid, cameraUuid)
+		},
+	}
+	actions['clear_user_preview'] = {
+		name: 'User: Clear Camera Selection',
+		description: "Select the choice with no camera on a user's controller switcher.",
+		options: [
+			{
+				id: 'user',
+				type: 'dropdown',
+				label: 'User',
+				choices: userChoices,
+				default: userChoices[0]?.id || '',
+			},
+		],
+		callback: async (action) => {
+			const userUuid = action.options.user as string
+			if (!userUuid) {
+				self.log('warn', 'User: Clear Camera Selection needs a user')
+				return
+			}
+			self.selectUserCamera(userUuid, null)
+		},
+	}
 
 	actions['set_user_step_size'] = {
 		name: 'User: Set Step Size',

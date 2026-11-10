@@ -295,6 +295,106 @@ test('a discovered RCP is reached at its announced address, Manual at the typed 
 	assert.equal(fields.find((field) => field.id === 'bonjourHost')?.type, 'bonjour-device')
 	assert.ok(ids.indexOf('bonjourHost') < ids.indexOf('host'), 'the picker comes before the manual address')
 	for (const id of ['host', 'port', 'tls']) {
-		assert.equal(fields.find((field) => field.id === id)?.isVisibleExpression, '!$(options:bonjourHost)')
+		assert.equal(
+			fields.find((field) => field.id === id)?.isVisibleExpression,
+			"$(options:connection) != 'cloud' && !$(options:bonjourHost)",
+		)
 	}
+})
+
+test('a refused token, a dead address and a gateway page say what went wrong', async () => {
+	const { createServer } = await import('node:http')
+	const server = new WebSocketServer({ port: 0, host: '127.0.0.1', verifyClient: (_info, done) => done(false, 401) })
+	await once(server, 'listening')
+	const reasons = []
+	const refused = new IntegrationApi(
+		`http://127.0.0.1:${server.address().port}`,
+		'wrong-token',
+		() => {},
+		(reason) => reasons.push(reason),
+	)
+	try {
+		refused.connect()
+		await until(() => reasons.length === 1)
+		assert.match(reasons[0], /refused the token \(HTTP 401\)/)
+	} finally {
+		refused.close()
+		await new Promise((r) => server.close(r))
+	}
+
+	const gateway = createServer((_request, response) => {
+		response.writeHead(502, { 'Content-Type': 'text/html' })
+		response.end('<html>Bad gateway</html>')
+	})
+	gateway.listen(0, '127.0.0.1')
+	await once(gateway, 'listening')
+	const debug = []
+	const api = new IntegrationApi(
+		`http://127.0.0.1:${gateway.address().port}`,
+		'',
+		() => {},
+		() => {},
+		(message) => debug.push(message),
+	)
+	try {
+		await assert.rejects(api.command({ type: 'routeSet' }), /Command rejected \(502\)/)
+		assert.match(debug[0], /^Command: .*routeSet/)
+		assert.match(debug[1], /^Command answer: HTTP 502/)
+	} finally {
+		api.close()
+		await new Promise((r) => gateway.close(r))
+	}
+
+	const dead = new IntegrationApi(
+		'http://127.0.0.1:9',
+		'',
+		() => {},
+		(reason) => reasons.push(reason),
+	)
+	try {
+		dead.connect()
+		await until(() => reasons.length === 2)
+		assert.match(reasons[1], /ECONNREFUSED/)
+	} finally {
+		dead.close()
+	}
+})
+
+test('the 1.0 user camera actions pick the choice on the user’s own switcher', async () => {
+	const { ModuleInstance } = await import('./dist/instance.js')
+	const sent = [],
+		warnings = []
+	const host = {
+		users: [{ uuid: 'ann', name: 'Ann' }],
+		cameras: [{ uuid: 'cam-2', name: 'CAM 2' }],
+		apiCameras: [],
+		controllerSwitchers: {
+			generation: 4,
+			switchers: [
+				{
+					id: 'sw-ann',
+					name: 'Ann',
+					ownerUserId: 'ann',
+					choices: [
+						{ id: 'none', name: 'None', targets: { camera: null } },
+						{ id: 'c1', name: 'CAM 1', targets: { camera: { type: 'camera', cameraId: 'cam-1' } } },
+						{ id: 'c2', name: 'CAM 2', targets: { camera: { type: 'camera', cameraId: 'cam-2' } } },
+					],
+				},
+			],
+		},
+		command: (op) => sent.push(op),
+		log: (_level, message) => warnings.push(message),
+		userSwitcher: ModuleInstance.prototype.userSwitcher,
+	}
+	const select = (user, camera) => ModuleInstance.prototype.selectUserCamera.call(host, user, camera)
+	select('ann', 'cam-2')
+	assert.deepEqual(sent[0], { type: 'controllerSelect', switcherId: 'sw-ann', choiceId: 'c2', expectedGeneration: 4 })
+	select('ann', null)
+	assert.equal(sent[1].choiceId, 'none')
+	select('ann', 'cam-9')
+	select('bob', 'cam-2')
+	assert.equal(sent.length, 2)
+	assert.match(warnings[0], /no choice for camera cam-9/)
+	assert.match(warnings[1], /no controller switcher/)
 })

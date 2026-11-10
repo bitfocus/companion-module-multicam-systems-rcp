@@ -141,7 +141,6 @@ export function deckActions(self: ModuleInstance): CompanionActionDefinitions {
 				const current = self.getUserStepSize(userUuid)
 				const next = STEP_ORDER[(STEP_ORDER.indexOf(current) + 1) % STEP_ORDER.length]
 				self.setUserStepSize(userUuid, next)
-				self.checkFeedbacks('deck_step_label')
 			},
 		},
 	}

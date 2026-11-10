@@ -52,7 +52,11 @@ number. When the camera does not take a control now (knee level while knee is on
 press is refused with the camera's reason in the log, and the **Property: Not Available Now**
 feedback can grey the button.
 
-Existing action and feedback IDs are retained. Presets are Companion 5 layered buttons,
+Buttons made with 1.0 keep their actions and feedbacks. **User: Select Camera** and **User:
+Clear Camera Selection** now select a choice on the user's controller switcher in Multicam (its
+choice for that camera, or its choice with no camera), so the user needs a switcher there; without
+one, or without a matching choice, the press is logged as a warning. **Controller: Select Choice**
+is the general form. Presets are Companion 5 layered buttons,
 arranged in sections per camera, user and router with a group per control family.
 Every numeric control has a **Gauge / rotary** preset: a ring gauge with the live value
 that also carries the encoder's rotate actions, so the same preset serves a button, a

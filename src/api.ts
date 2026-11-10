@@ -196,6 +196,14 @@ export function reduceState(
 	return { state: { ...(m.type === 'snapshot' ? {} : current), ...m.replace }, revision: m.revision! }
 }
 
+function errorText(error: unknown): string {
+	if (error instanceof Error) {
+		const code = (error as { code?: string }).code
+		return code && !error.message.includes(code) ? `${error.message} (${code})` : error.message
+	}
+	return String(error)
+}
+
 export class IntegrationApi {
 	private socket: WebSocket | null = null
 	private revision = 0
@@ -203,19 +211,23 @@ export class IntegrationApi {
 	private closed = false
 	private heartbeat: NodeJS.Timeout | null = null
 	private requests = new Set<AbortController>()
+	/** The last thing that went wrong on this connection, given to `onClose`. */
+	private lastError: string | undefined
 	constructor(
 		readonly url: string,
 		private token: string | (() => Promise<string>),
 		private onState: (state: State) => void,
-		private onClose: () => void,
+		private onClose: (reason: string | undefined) => void,
+		/** Set when the user asks for debug messages: state messages in, commands out. */
+		private debug?: (message: string) => void,
 	) {}
 	private currentToken = ''
 	private async accessToken(): Promise<string> {
 		return typeof this.token === 'string' ? this.token : this.token()
 	}
 	connect(): void {
-		void this.open().catch(() => {
-			if (!this.closed) this.onClose()
+		void this.open().catch((error) => {
+			if (!this.closed) this.onClose(errorText(error))
 		})
 	}
 	private async open(): Promise<void> {
@@ -231,31 +243,48 @@ export class IntegrationApi {
 			lastPong = Date.now()
 			this.heartbeat = setInterval(() => {
 				if (Date.now() - lastPong > 4000) {
+					this.lastError = 'RCP stopped answering (no pong for 4 s)'
 					socket.terminate()
 					return
 				}
 				if (socket.readyState === WebSocket.OPEN) socket.ping()
 			}, 1000)
 		})
+		socket.on('unexpected-response', (_request, response) => {
+			this.lastError =
+				response.statusCode === 401 || response.statusCode === 403
+					? `RCP refused the token (HTTP ${response.statusCode})`
+					: `RCP answered HTTP ${response.statusCode}`
+			socket.terminate()
+		})
 		this.socket.on('message', (data) => {
 			try {
-				const next = reduceState(this.state, this.revision, JSON.parse(text(data)))
+				const body = text(data)
+				this.debug?.(`State message: ${body.length > 2000 ? body.slice(0, 2000) + '…' : body}`)
+				const next = reduceState(this.state, this.revision, JSON.parse(body))
 				if (!next) {
+					this.debug?.(`Out of step at revision ${this.revision}; asking for a resync`)
 					this.socket?.send(JSON.stringify({ type: 'resync' }))
 					return
 				}
 				this.state = next.state
 				this.revision = next.revision
 				this.onState(this.state)
-			} catch {
+			} catch (error) {
+				this.lastError = `Unreadable state message: ${errorText(error)}`
 				this.socket?.close()
 			}
 		})
-		this.socket.on('error', () => this.socket?.close())
-		this.socket.on('close', () => {
+		this.socket.on('error', (error) => {
+			this.lastError ??= errorText(error)
+			this.socket?.close()
+		})
+		this.socket.on('close', (code, reason) => {
 			if (this.heartbeat) clearInterval(this.heartbeat)
 			this.heartbeat = null
-			if (!this.closed) this.onClose()
+			const why = this.lastError ?? (reason.length ? reason.toString() : code === 1006 ? undefined : `closed (${code})`)
+			this.lastError = undefined
+			if (!this.closed) this.onClose(why)
 		})
 	}
 	private authHeaders(token: string): Record<string, string> {
@@ -276,13 +305,21 @@ export class IntegrationApi {
 		try {
 			const token = await this.accessToken()
 			if (this.closed) throw Error('Connection closed')
+			const body = JSON.stringify({ requestId: randomUUID(), sentAtMs: Date.now(), ttlMs: 2000, operation })
+			this.debug?.(`Command: ${body}`)
 			const response = await fetch(new URL(this.url.replace(/\/$/, '') + '/api/v1/commands'), {
 				method: 'POST',
 				headers: { ...this.authHeaders(token), 'Content-Type': 'application/json' },
-				body: JSON.stringify({ requestId: randomUUID(), sentAtMs: Date.now(), ttlMs: 2000, operation }),
+				body,
 				signal: abort.signal,
 			})
-			const result = (await response.json()) as { status?: string; error?: { message?: string }; errorCode?: string }
+			// A gateway or a refused token can answer with plain text or HTML: the status still counts.
+			const result = (await response.json().catch(() => ({}))) as {
+				status?: string
+				error?: { message?: string }
+				errorCode?: string
+			}
+			this.debug?.(`Command answer: HTTP ${response.status} ${JSON.stringify(result)}`)
 			if (!response.ok || result.status === 'rejected')
 				throw new Error(result.error?.message || result.errorCode || `Command rejected (${response.status})`)
 		} finally {
