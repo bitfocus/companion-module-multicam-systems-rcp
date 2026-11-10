@@ -290,17 +290,26 @@ export class ModuleInstance extends ModuleBase {
 			(state) => {
 				if (this.api === api) this.applyApiState(state)
 			},
-			() => {
+			(reason) => {
 				if (this.api !== api) return
+				const wasConnected = this.connected
 				this.connected = false
 				this.images.disconnect()
 				this.propertyValues.clear()
 				this.invalidateTallyCache()
 				this.checkAllFeedbacks()
 				this.scheduleVariableUpdate()
-				this.updateStatus(InstanceStatus.ConnectionFailure, 'API disconnected; verify host, token and project access')
+				this.updateStatus(
+					InstanceStatus.ConnectionFailure,
+					reason ?? 'API disconnected; verify host, token and project access',
+				)
+				this.log(
+					'warn',
+					`${wasConnected ? 'Lost the connection to' : 'Could not connect to'} ${url}: ${reason ?? 'closed without a reason'}`,
+				)
 				this.maybeReconnect()
 			},
+			this.config.debug_messages ? (message) => this.log('debug', message) : undefined,
 		)
 		this.api = api
 		api.connect()
@@ -349,8 +358,9 @@ export class ModuleInstance extends ModuleBase {
 		])
 		const changed = this.lastTopology !== topology
 		this.lastTopology = topology
+		// Only on the change: Companion passes every status on, repeats included.
+		if (!this.connected) this.updateStatus(InstanceStatus.Ok)
 		this.connected = true
-		this.updateStatus(InstanceStatus.Ok)
 		this.apiCameras = state.cameras ?? []
 		this.presentation = state.presentation
 		this.controllerSwitchers = state.controllerSwitchers
@@ -679,6 +689,7 @@ export class ModuleInstance extends ModuleBase {
 			'deck_slot_max',
 			'deck_slot_name',
 			'deck_slot_text',
+			'deck_slot_accent',
 		)
 	}
 	/** The switcher feeding a user's virtual camera, whose choices are the user's cameras. */
@@ -690,6 +701,44 @@ export class ModuleInstance extends ModuleBase {
 		const slot = virtualCamera?.controllerSwitcherSlot
 		if (slot) return this.controllerSwitchers?.switchers.find((s) => s.id === slot.switcherId)
 		return this.controllerSwitchers?.switchers.find((s) => s.ownerUserId === userUuid)
+	}
+	/**
+	 * The 1.0 actions "User: Select Camera" and "User: Clear Camera Selection", on the
+	 * controller switchers that replaced the per-user preview: picks the choice of the
+	 * user's switcher that puts this camera on it (or, to clear, the choice with no camera).
+	 */
+	selectUserCamera(userUuid: string, cameraUuid: string | null): void {
+		const user = this.users.find((u) => u.uuid === userUuid)
+		const who = user?.name ?? userUuid
+		const switcher = this.userSwitcher(userUuid)
+		const generation = this.controllerSwitchers?.generation
+		if (!switcher || !Number.isSafeInteger(generation)) {
+			this.log(
+				'warn',
+				`User ${who} has no controller switcher in Multicam, so there is no camera to select. Set one up in Multicam, or use Controller: Select Choice.`,
+			)
+			return
+		}
+		const putsCamera = (choice: (typeof switcher.choices)[number]) =>
+			Object.values(choice.targets).some((t) => t?.type === 'camera' && t.cameraId === cameraUuid)
+		const empty = (choice: (typeof switcher.choices)[number]) => Object.values(choice.targets).every((t) => !t)
+		const choice = switcher.choices.find(cameraUuid ? putsCamera : empty)
+		if (!choice) {
+			const camera = this.cameras.find((c) => c.uuid === cameraUuid)?.name ?? cameraUuid
+			this.log(
+				'warn',
+				cameraUuid
+					? `${switcher.name} has no choice for camera ${camera}. Add it in Multicam, or use Controller: Select Choice.`
+					: `${switcher.name} has no empty choice to clear to. Use Controller: Select Choice.`,
+			)
+			return
+		}
+		this.command({
+			type: 'controllerSelect',
+			switcherId: switcher.id,
+			choiceId: choice.id,
+			expectedGeneration: generation,
+		})
 	}
 	/** The real camera a user is on right now: the switcher's effective choice, else the preview. */
 	userSelectedCameraUuid(userUuid: string): string | undefined {
@@ -721,7 +770,7 @@ export class ModuleInstance extends ModuleBase {
 	setUserStepSize(userUuid: string, stepSize: 'big' | 'normal' | 'small'): void {
 		this.userStepSizes.set(userUuid, stepSize)
 		this.log('info', `Set step size for user ${userUuid} to ${stepSize}`)
-		this.checkFeedbacks('user_step_size')
+		this.checkFeedbacks('user_step_size', 'deck_step_label')
 	}
 
 	/**

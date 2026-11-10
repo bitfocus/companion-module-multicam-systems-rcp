@@ -81,3 +81,18 @@ test('the live image feedback hands Companion 4 the JPEG without its data URI pr
 	})
 	assert.equal(result.png64, 'QUJD')
 })
+
+test('Companion 4 gets no module API 2 fields', async () => {
+	const { withoutApi2Fields } = await import('./dist/companion.js')
+	const { feedback, action } = withoutApi2Fields({
+		feedback: {
+			type: 'advanced',
+			affectedProperties: ['text'],
+			options: [{ id: 'mode', disableAutoExpression: true }],
+		},
+		action: { name: 'x', options: [{ id: 'user', isVisibleExpression: '$(options:mode)' }] },
+	})
+	assert.equal('affectedProperties' in feedback, false)
+	assert.deepEqual(feedback.options, [{ id: 'mode' }])
+	assert.deepEqual(action.options, [{ id: 'user', isVisibleExpression: '$(options:mode)' }])
+})
