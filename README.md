@@ -25,7 +25,7 @@ Companion's types from), `src/main.ts` (the entry), `src/presets/`, `test-preset
 
 ## Development
 
-Use Node 22.20+ or 26.5+ and the pinned Yarn version.
+Use Node 26 and the pinned Yarn version.
 
 ```sh
 yarn install
@@ -54,7 +54,10 @@ The RCP's Setup → Companion buttons page (`state.presentation` in the API) sel
 gauge theme, accent mode, top bar and which cameras/routers get presets; the tiles read
 it through `applyPresentation()`.
 
-Saved action/feedback IDs and explicit host/port settings are retained on upgrade.
+Saved actions, feedbacks and explicit host/port settings carry over from 1.0. **User: Select
+Camera** and **User: Clear Camera Selection** now act through the user's controller switcher in
+Multicam: they pick that switcher's choice for the camera (or its choice with no camera), and log
+a warning when the user has no switcher or no such choice.
 A newly issued API token is required. This beta is not a release for older Electron
 servers. Companion and Central Control partner acceptance should precede a stable API commitment.
 
@@ -79,6 +82,6 @@ studio choices. Feedback shows the effective choice imposed by a parent switcher
 Selections use the current assignment generation; a conflicting edit requires fresh
 state and a new operator selection. No routing or mixer scene is recalled.
 
-Configure switchers in Multicam first. This pre-release cutover replaces the former
-User Select/Clear Camera actions and their automatically generated per-camera buttons.
-There is no project/preset migration. Gauges and live video presets remain available.
+Configure switchers in Multicam first. Controller choices replace the 1.0 automatically
+generated per-camera user buttons; saved **User: Select Camera** / **User: Clear Camera
+Selection** buttons keep working through the user's own switcher (see above). Gauges and live video presets remain available.

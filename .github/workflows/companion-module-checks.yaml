@@ -2,44 +2,17 @@ name: Companion Module Checks
 
 on:
   push:
-  pull_request:
-
-permissions:
-  contents: read
 
 jobs:
   check:
-    name: Test and package Companion module
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      # The upstream reusable job removes contents permission and cannot clone this private fork.
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22.23.1'
-      - run: corepack enable
-      - run: yarn install --immutable
-      - run: yarn test
-      - run: yarn lint
-      - run: yarn companion-module-check
-      - run: yarn package
-      - name: Verify packaged API 2 entrypoint
-        run: |
-          mkdir -p "$RUNNER_TEMP/companion-module"
-          tar -xzf multicam-systems-rcp-*.tgz --strip-components=1 -C "$RUNNER_TEMP/companion-module"
-          MODULE_PACKAGE="$RUNNER_TEMP/companion-module" node --input-type=module <<'JS'
-          import {readFileSync} from 'node:fs'
-          import {pathToFileURL} from 'node:url'
-          import {resolve} from 'node:path'
-          const root = process.env.MODULE_PACKAGE
-          const manifest = JSON.parse(readFileSync(resolve(root, 'companion/manifest.json')))
-          if (!manifest.runtime.apiVersion.startsWith('2.')) throw Error('Expected Companion API 2 package')
-          const entry = await import(pathToFileURL(resolve(root, 'companion', manifest.runtime.entrypoint)))
-          if (typeof entry.default !== 'function') throw Error('Package does not export a module class')
-          JS
-      - uses: actions/upload-artifact@v4
-        with:
-          name: multicam-companion-module
-          path: multicam-systems-rcp-*.tgz
-          if-no-files-found: error
+    name: Check module
+
+    if: ${{ !contains(github.repository, 'companion-module-template-') }}
+
+    permissions:
+      packages: read
+
+    uses: bitfocus/actions/.github/workflows/module-checks.yaml@main
+    # with:
+    #   upload-artifact: true # uncomment this to upload the built package as an artifact to this workflow that you can download and share with others
+
