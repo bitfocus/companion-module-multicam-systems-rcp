@@ -21,7 +21,7 @@
 		"url": "git+https://github.com/bitfocus/companion-module-multicam-systems-rcp.git"
 	},
 	"engines": {
-		"node": "^22.20 || ^26.5",
+		"node": "^26",
 		"yarn": "^4"
 	},
 	"dependencies": {
@@ -32,7 +32,7 @@
 		"@companion-module/tools": "^3.1.0",
 		"@trpc/client": "^11.18.0",
 		"@trpc/server": "^11.18.0",
-		"@types/node": "^22.18.13",
+		"@types/node": "^26.6.4",
 		"@types/ws": "^8.18.1",
 		"eslint": "^10.0.0",
 		"husky": "^9.1.7",
